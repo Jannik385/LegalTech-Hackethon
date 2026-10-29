@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -14,3 +15,18 @@ if not OPENROUTER_API_KEY:
         "OPENROUTER_API_KEY is not set. "
         "Copy .env.example to .env and add your key from https://openrouter.ai/keys"
     )
+
+# ---------------------------------------------------------------------------
+# RAG configuration
+# ---------------------------------------------------------------------------
+
+_BASE = Path(__file__).parent  # backend/
+
+# Local ChromaDB persistence directory
+CHROMA_PATH = str(_BASE / ".chromadb")
+
+# Sentence-transformers model for embeddings (multilingual, handles German well)
+EMBEDDING_MODEL = "intfloat/multilingual-e5-large"
+
+# Directory containing Mietrecht law text files
+LAW_TEXTS_PATH = str(_BASE / "law_texts")

@@ -16,3 +16,6 @@ build/
 
 # Excluded example/scratch folder
 openrouter-example/
+
+# ChromaDB local vector store
+backend/.chromadb/

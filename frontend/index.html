@@ -246,12 +246,35 @@
       margin-bottom: 4px;
     }
 
+    /* ── Legal-category sections ────────────────────────────────────────── */
+    .legal-section { margin-bottom: 28px; }
+    .legal-section:last-child { margin-bottom: 0; }
+    .legal-section-header {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.07em;
+      margin-bottom: 14px;
+      padding-bottom: 6px;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .section-formell       .legal-section-header { color: #3b82d4; border-color: #3b82d4; }
+    .section-materiell     .legal-section-header { color: #7c5cd8; border-color: #7c5cd8; }
+    .section-hauptverhandlung .legal-section-header { color: #0d9488; border-color: #0d9488; }
+
     /* ── Topic blocks (two-sided overview) ─────────────────────────────── */
     .topic-block {
       margin-bottom: 20px;
     }
     .topic-block:last-child { margin-bottom: 0; }
     .topic-title {
+      display: flex;
+      align-items: baseline;
+      flex-wrap: wrap;
+      gap: 6px;
       font-size: 0.9rem;
       font-weight: 700;
       color: #1f2328;
@@ -295,6 +318,58 @@
       color: #1f2328;
     }
     .topic-side ul li:last-child { margin-bottom: 0; }
+
+    /* ── Law paragraph badges ───────────────────────────────────────────── */
+    .law-badge {
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: #e5e7eb;
+      color: #374151;
+      white-space: nowrap;
+    }
+
+    /* ── Missing documents panel (per topic) ───────────────────────────── */
+    .missing-docs-panel {
+      margin-top: 10px;
+      border: 1px solid #fbbf24;
+      border-radius: 8px;
+      overflow: hidden;
+    }
+    .missing-docs-header {
+      background: #fef9c3;
+      padding: 8px 14px;
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: #92400e;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+    }
+    .missing-docs-body {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 0;
+    }
+    .missing-docs-side {
+      padding: 10px 14px;
+      border-right: 1px solid #fbbf24;
+      font-size: 0.85rem;
+    }
+    .missing-docs-side:last-child { border-right: none; }
+    .missing-docs-side-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      color: #92400e;
+      margin-bottom: 6px;
+    }
+    .missing-docs-side ul {
+      margin: 0;
+      padding-left: 16px;
+    }
+    .missing-docs-side ul li { margin-bottom: 3px; color: #78350f; }
 
     /* ── File item with category badge ────────────────────────────────── */
     .file-item {
@@ -615,23 +690,80 @@
       summariesSection.style.display = 'block';
     }
 
+    // ── Section config ────────────────────────────────────────────────────
+    const LEGAL_SECTIONS = [
+      { key: 'formellrechtlich',    label: 'Formell-rechtlich',    cls: 'section-formell' },
+      { key: 'materiellrechtlich',  label: 'Materiell-rechtlich',  cls: 'section-materiell' },
+      { key: 'hauptverhandlung',    label: 'Hauptverhandlung',     cls: 'section-hauptverhandlung' },
+    ];
+
     function renderTopicsHtml(topics) {
-      return topics.map(t => {
-        const sidesHtml = t.sides.map((side, idx) => {
-          const cls = idx === 0 ? 'topic-side-a' : 'topic-side-b';
-          const pointsHtml = side.points.length > 0
-            ? '<ul>' + side.points.map(p => `<li>${escHtml(p)}</li>`).join('') + '</ul>'
-            : '<p class="empty-note" style="margin:0">—</p>';
-          return `<div class="topic-side ${cls}">
-            <div class="topic-side-label" title="${escHtml(side.side)}">${escHtml(side.side)}</div>
-            ${pointsHtml}
-          </div>`;
-        }).join('');
-        return `<div class="topic-block">
-          <div class="topic-title">${escHtml(t.title)}</div>
-          <div class="topic-sides">${sidesHtml}</div>
+      let html = '';
+
+      // Group topics by category, render each non-empty section
+      LEGAL_SECTIONS.forEach(sec => {
+        const sectionTopics = topics.filter(t => t.category === sec.key);
+        if (sectionTopics.length === 0) return;
+
+        const blocksHtml = sectionTopics.map(t => renderTopicBlock(t)).join('');
+
+        html += `<div class="legal-section ${sec.cls}">
+          <div class="legal-section-header">${sec.label}</div>
+          ${blocksHtml}
+        </div>`;
+      });
+
+      // Topics with unknown/missing category — render at end without section header
+      const uncategorised = topics.filter(t =>
+        !LEGAL_SECTIONS.find(s => s.key === t.category)
+      );
+      if (uncategorised.length > 0) {
+        html += uncategorised.map(t => renderTopicBlock(t)).join('');
+      }
+
+      return html;
+    }
+
+    function renderTopicBlock(t) {
+      const lawBadges = (t.relevant_law || []).map(l =>
+        `<span class="law-badge">${escHtml(l)}</span>`
+      ).join('');
+      const sidesHtml = t.sides.map((side, idx) => {
+        const cls = idx === 0 ? 'topic-side-a' : 'topic-side-b';
+        const pointsHtml = side.points.length > 0
+          ? '<ul>' + side.points.map(p => `<li>${escHtml(p)}</li>`).join('') + '</ul>'
+          : '<p class="empty-note" style="margin:0">—</p>';
+        return `<div class="topic-side ${cls}">
+          <div class="topic-side-label" title="${escHtml(side.side)}">${escHtml(side.side)}</div>
+          ${pointsHtml}
         </div>`;
       }).join('');
+      const missingHtml = (t.missing_documents && t.missing_documents.length > 0)
+        ? renderMissingDocsHtml(t.missing_documents)
+        : '';
+      return `<div class="topic-block">
+        <div class="topic-title">${escHtml(t.title)}${lawBadges}</div>
+        <div class="topic-sides">${sidesHtml}</div>
+        ${missingHtml}
+      </div>`;
+    }
+
+    function renderMissingDocsHtml(missingDocs) {
+      const sidesHtml = missingDocs.map(m => {
+        const itemsHtml = m.items.length > 0
+          ? '<ul>' + m.items.map(i => `<li>${escHtml(i)}</li>`).join('') + '</ul>'
+          : '';
+        if (!itemsHtml) return '';
+        return `<div class="missing-docs-side">
+          <div class="missing-docs-side-label">${escHtml(m.side)}</div>
+          ${itemsHtml}
+        </div>`;
+      }).filter(Boolean).join('');
+      if (!sidesHtml) return '';
+      return `<div class="missing-docs-panel">
+        <div class="missing-docs-header">⚠ Fehlende Unterlagen</div>
+        <div class="missing-docs-body">${sidesHtml}</div>
+      </div>`;
     }
 
     function renderFlatFactsHtml(key_facts) {

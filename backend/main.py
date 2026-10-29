@@ -1,4 +1,5 @@
 import mimetypes
+from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse
@@ -9,8 +10,17 @@ from backend.services.classifier import classify_file
 from backend.services.summarizer import summarize_all_md
 from backend.services.linker import link_results
 from backend.services.renderer import render_dashboard
+from backend.services.rag import ingest_law_texts
 
-app = FastAPI(title="LegalTech Document Analyzer")
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Index law texts into ChromaDB on startup (no-op if already indexed or RAG unavailable)."""
+    ingest_law_texts()
+    yield
+
+
+app = FastAPI(title="LegalTech Document Analyzer", lifespan=lifespan)
 
 # ---------------------------------------------------------------------------
 # In-memory session store — keyed by filename, value is raw bytes.
