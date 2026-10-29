@@ -1,0 +1,18 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.egg-info/
+dist/
+build/
+
+# Environment variables
+.env
+
+# macOS
+.DS_Store
+
+# Excluded example/scratch folder
+openrouter-example/

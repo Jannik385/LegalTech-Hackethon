@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>LegalTech Document Analyzer</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      max-width: 760px;
+      margin: 60px auto;
+      padding: 0 24px;
+      color: #1f2328;
+      background: #ffffff;
+    }
+
+    h1 { font-size: 1.6rem; margin-bottom: 0.25rem; }
+    p.subtitle { color: #57606a; margin-top: 0; }
+
+    /* ── Drop zone ─────────────────────────────────────────────────────── */
+    #drop-zone {
+      border: 2px dashed #e5e7eb;
+      border-radius: 8px;
+      padding: 40px 24px;
+      text-align: center;
+      color: #57606a;
+      cursor: pointer;
+      transition: border-color 0.15s, background 0.15s;
+      margin-top: 32px;
+    }
+    #drop-zone.drag-over {
+      border-color: #3b82d4;
+      background: #f0f6ff;
+      color: #1f2328;
+    }
+    #drop-zone p { margin: 0 0 12px; font-size: 0.95rem; }
+    #drop-zone input[type="file"] { display: none; }
+
+    #pick-btn {
+      display: inline-block;
+      padding: 8px 18px;
+      background: #1f2328;
+      color: #ffffff;
+      border-radius: 6px;
+      font-size: 0.875rem;
+      cursor: pointer;
+      border: none;
+    }
+    #pick-btn:hover { background: #3b82d4; }
+
+    /* ── Selected-file preview ─────────────────────────────────────────── */
+    #selected-list {
+      margin-top: 12px;
+      font-size: 0.85rem;
+      color: #57606a;
+      min-height: 20px;
+    }
+
+    /* ── Upload button ─────────────────────────────────────────────────── */
+    #upload-btn {
+      margin-top: 16px;
+      padding: 10px 24px;
+      background: #3b82d4;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: none;
+    }
+    #upload-btn:disabled { opacity: 0.6; cursor: default; }
+    #upload-btn:not(:disabled):hover { background: #2563b0; }
+
+    /* ── Results ───────────────────────────────────────────────────────── */
+    #results { margin-top: 36px; display: none; }
+
+    .bucket {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      padding: 16px 20px;
+      margin-bottom: 16px;
+    }
+    .bucket h2 {
+      font-size: 1rem;
+      margin: 0 0 10px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .badge {
+      display: inline-block;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 7px;
+      border-radius: 10px;
+      vertical-align: middle;
+    }
+    .badge-md         { background: #dbeafe; color: #1d4ed8; }
+    .badge-other      { background: #e5e7eb; color: #374151; }
+    /* Classification category badges */
+    .badge-foto       { background: #fef9c3; color: #92400e; }
+    .badge-vertrag    { background: #d1fae5; color: #065f46; }
+    .badge-rechnung   { background: #fee2e2; color: #991b1b; }
+    .badge-unterschrift { background: #ede9fe; color: #4c1d95; }
+    .badge-sonstiges  { background: #f3f4f6; color: #374151; }
+
+    .bucket ul {
+      list-style: none;
+      margin: 0;
+      padding: 0;
+    }
+    .bucket ul li {
+      padding: 4px 0;
+      font-size: 0.875rem;
+      border-bottom: 1px solid #e5e7eb;
+    }
+    .bucket ul li:last-child { border-bottom: none; }
+
+    .empty-note { color: #57606a; font-size: 0.875rem; font-style: italic; }
+
+    /* ── Classify button ───────────────────────────────────────────────── */
+    #classify-btn {
+      margin-top: 12px;
+      padding: 10px 24px;
+      background: #7c5cd8;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: none;
+    }
+    #classify-btn:disabled { opacity: 0.6; cursor: default; }
+    #classify-btn:not(:disabled):hover { background: #5b3db5; }
+
+    /* ── Summarize button ──────────────────────────────────────────────── */
+    #summarize-btn {
+      margin-top: 12px;
+      margin-left: 8px;
+      padding: 10px 24px;
+      background: #2563b0;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: none;
+    }
+    #summarize-btn:disabled { opacity: 0.6; cursor: default; }
+    #summarize-btn:not(:disabled):hover { background: #1d4ed8; }
+
+    /* ── Link button ───────────────────────────────────────────────────────── */
+    #link-btn {
+      margin-top: 12px;
+      margin-left: 8px;
+      padding: 10px 24px;
+      background: #059669;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: none;
+    }
+    #link-btn:disabled { opacity: 0.6; cursor: default; }
+    #link-btn:not(:disabled):hover { background: #047857; }
+
+    #dashboard-btn {
+      margin-top: 12px;
+      margin-left: 8px;
+      padding: 10px 24px;
+      background: #1f2328;
+      color: #ffffff;
+      border: none;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      cursor: pointer;
+      display: none;
+      text-decoration: none;
+    }
+    #dashboard-btn:hover { background: #374151; }
+
+    /* ── Summary cards ─────────────────────────────────────────────────── */
+    #summaries-section { margin-top: 32px; display: none; }
+    #summaries-section h2 {
+      font-size: 1.1rem;
+      margin-bottom: 14px;
+    }
+
+    .summary-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .summary-card summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f7f8fa;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      list-style: none;
+      user-select: none;
+    }
+    .summary-card summary::-webkit-details-marker { display: none; }
+    .summary-card summary::after {
+      content: '▸';
+      font-size: 0.75rem;
+      color: #57606a;
+      transition: transform 0.15s;
+    }
+    .summary-card[open] summary::after { transform: rotate(90deg); }
+    .summary-card summary:hover { background: #eef0f3; }
+
+    .summary-body {
+      padding: 14px 16px;
+      font-size: 0.875rem;
+      line-height: 1.65;
+    }
+    .summary-body p { margin: 0 0 10px; }
+    .summary-body ul {
+      margin: 0 0 10px;
+      padding-left: 20px;
+    }
+    .summary-body ul li { margin-bottom: 4px; }
+    .summary-body .template-block {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 10px 14px;
+      font-family: monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      color: #374151;
+      margin-top: 10px;
+    }
+    .summary-body .template-label {
+      font-size: 0.75rem;
+      color: #57606a;
+      margin-bottom: 4px;
+    }
+
+    /* ── Topic blocks (two-sided overview) ─────────────────────────────── */
+    .topic-block {
+      margin-bottom: 20px;
+    }
+    .topic-block:last-child { margin-bottom: 0; }
+    .topic-title {
+      font-size: 0.9rem;
+      font-weight: 700;
+      color: #1f2328;
+      margin: 0 0 10px;
+      padding-bottom: 6px;
+      border-bottom: 2px solid #e5e7eb;
+    }
+    .topic-sides {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+    }
+    .topic-side {
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+      padding: 10px 12px;
+    }
+    .topic-side-a { border-top: 3px solid #3b82d4; }
+    .topic-side-b { border-top: 3px solid #7c5cd8; }
+    .topic-side-label {
+      font-size: 0.72rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 7px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .topic-side-a .topic-side-label { color: #3b82d4; }
+    .topic-side-b .topic-side-label { color: #7c5cd8; }
+    .topic-side ul {
+      margin: 0;
+      padding-left: 16px;
+    }
+    .topic-side ul li {
+      font-size: 0.85rem;
+      line-height: 1.55;
+      margin-bottom: 4px;
+      color: #1f2328;
+    }
+    .topic-side ul li:last-child { margin-bottom: 0; }
+
+    /* ── File item with category badge ────────────────────────────────── */
+    .file-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px 0;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 0.875rem;
+    }
+    .file-item:last-child { border-bottom: none; }
+    .file-item .filename { flex: 1; }
+    .file-item .cat-badge { margin-left: 8px; flex-shrink: 0; }
+    .file-item .confidence { color: #57606a; font-size: 0.75rem; margin-left: 8px; flex-shrink: 0; max-width: 240px; text-align: right; }
+
+
+    /* ── Linked report section ─────────────────────────────────────────────── */
+    #linked-section { margin-top: 32px; display: none; }
+    #linked-section h2 { font-size: 1.1rem; margin-bottom: 14px; }
+
+    .linked-card {
+      border: 1px solid #e5e7eb;
+      border-radius: 8px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+    .linked-card summary {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 12px 16px;
+      background: #f0fdf4;
+      cursor: pointer;
+      font-size: 0.9rem;
+      font-weight: 600;
+      list-style: none;
+      user-select: none;
+    }
+    .linked-card summary::-webkit-details-marker { display: none; }
+    .linked-card summary::after {
+      content: '▸';
+      font-size: 0.75rem;
+      color: #57606a;
+      transition: transform 0.15s;
+    }
+    .linked-card[open] summary::after { transform: rotate(90deg); }
+    .linked-card summary:hover { background: #dcfce7; }
+
+    .linked-body {
+      padding: 14px 16px;
+      font-size: 0.875rem;
+      line-height: 1.65;
+    }
+    .linked-body .evidence-list {
+      margin-top: 10px;
+      padding: 10px 14px;
+      background: #f7f8fa;
+      border: 1px solid #e5e7eb;
+      border-radius: 6px;
+    }
+    .linked-body .evidence-list h4 {
+      margin: 0 0 8px;
+      font-size: 0.8rem;
+      color: #57606a;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .evidence-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 4px 0;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 0.85rem;
+    }
+    .evidence-item:last-child { border-bottom: none; }
+    .no-evidence { color: #57606a; font-size: 0.8rem; font-style: italic; }
+
+
+    /* ── Status message ────────────────────────────────────────────────── */
+    #status {
+      margin-top: 10px;
+      font-size: 0.85rem;
+      min-height: 18px;
+      color: #57606a;
+    }
+    #status.error { color: #b91c1c; }
+  </style>
+</head>
+<body>
+
+  <h1>LegalTech Document Analyzer</h1>
+  <p class="subtitle">Dokumente hochladen, klassifizieren und zusammenfassen.</p>
+
+  <!-- ── Drop zone ─────────────────────────────────────────────────────── -->
+  <div id="drop-zone">
+    <p>Dateien hierher ziehen oder auswählen</p>
+    <label id="pick-btn">
+      Dateien auswählen
+      <input type="file" id="file-input" multiple />
+    </label>
+  </div>
+
+  <div id="selected-list"></div>
+  <button id="upload-btn">Hochladen</button>
+  <button id="classify-btn">Beweise klassifizieren</button>
+  <button id="summarize-btn">Markdown zusammenfassen</button>
+  <button id="link-btn">Nachweise verlinken</button>
+  <a id="dashboard-btn" href="/dashboard" target="_blank">Dashboard anzeigen ↗</a>
+  <div id="status"></div>
+
+  <!-- ── Results ───────────────────────────────────────────────────────── -->
+  <div id="results">
+    <div class="bucket" id="bucket-md">
+      <h2>Markdown-Dateien <span class="badge badge-md" id="count-md">0</span></h2>
+      <ul id="list-md"></ul>
+    </div>
+    <div class="bucket" id="bucket-other">
+      <h2>Andere Dateien <span class="badge badge-other" id="count-other">0</span></h2>
+      <ul id="list-other"></ul>
+    </div>
+  </div>
+
+  <!-- ── Summary cards ────────────────────────────────────────────────────── -->
+  <div id="summaries-section">
+    <h2>Gesamtübersicht (alle Markdown-Dateien)</h2>
+    <div id="summary-cards"></div>
+  </div>
+
+  <!-- ── Linked report ────────────────────────────────────────────────────── -->
+  <div id="linked-section">
+    <h2>Verlinkte Nachweise</h2>
+    <div id="linked-cards"></div>
+  </div>
+
+  <script>
+    const dropZone        = document.getElementById('drop-zone');
+    const fileInput       = document.getElementById('file-input');
+    const selectedList    = document.getElementById('selected-list');
+    const uploadBtn       = document.getElementById('upload-btn');
+    const classifyBtn     = document.getElementById('classify-btn');
+    const summarizeBtn    = document.getElementById('summarize-btn');
+    const linkBtn         = document.getElementById('link-btn');
+    const dashboardBtn    = document.getElementById('dashboard-btn');
+    const statusEl        = document.getElementById('status');
+    const results         = document.getElementById('results');
+    const summariesSection = document.getElementById('summaries-section');
+    const summaryCards    = document.getElementById('summary-cards');
+    const linkedSection   = document.getElementById('linked-section');
+    const linkedCards     = document.getElementById('linked-cards');
+
+    let selectedFiles = [];
+
+    // ── Drag-and-drop events ──────────────────────────────────────────────
+    dropZone.addEventListener('dragover', (e) => {
+      e.preventDefault();
+      dropZone.classList.add('drag-over');
+    });
+    dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+    dropZone.addEventListener('drop', (e) => {
+      e.preventDefault();
+      dropZone.classList.remove('drag-over');
+      setFiles(Array.from(e.dataTransfer.files));
+    });
+
+    // ── File-picker change ────────────────────────────────────────────────
+    fileInput.addEventListener('change', () => {
+      setFiles(Array.from(fileInput.files));
+    });
+
+    function setFiles(files) {
+      selectedFiles = files;
+      if (files.length === 0) {
+        selectedList.textContent = '';
+        uploadBtn.style.display = 'none';
+        classifyBtn.style.display = 'none';
+        return;
+      }
+      selectedList.textContent = files.map(f => f.name).join(', ');
+      uploadBtn.style.display = 'inline-block';
+      statusEl.textContent = '';
+      statusEl.className = '';
+      results.style.display = 'none';
+    }
+
+    // ── Upload ────────────────────────────────────────────────────────────
+    uploadBtn.addEventListener('click', async () => {
+      if (selectedFiles.length === 0) return;
+
+      uploadBtn.disabled = true;
+      statusEl.className = '';
+      statusEl.textContent = 'Wird hochgeladen…';
+
+      const formData = new FormData();
+      selectedFiles.forEach(f => formData.append('files', f));
+
+      try {
+        const response = await fetch('/upload', { method: 'POST', body: formData });
+        if (!response.ok) throw new Error(`Server: ${response.status} ${response.statusText}`);
+        const data = await response.json();
+        renderUploadResults(data);
+        statusEl.textContent = 'Upload erfolgreich.';
+        // Show classify button only if there are non-MD files
+        if (data.other_files.length > 0) {
+          classifyBtn.style.display = 'inline-block';
+        }
+        // Show summarize button only if there are md files
+        if (data.md_files.length > 0) {
+          summarizeBtn.style.display = 'inline-block';
+        }
+        // Reset link button visibility on new upload
+        linkBtn.style.display = 'none';
+        linkedSection.style.display = 'none';
+      } catch (err) {
+        statusEl.textContent = err.message;
+        statusEl.className = 'error';
+      } finally {
+        uploadBtn.disabled = false;
+      }
+    });
+
+    // ── Classify ─────────────────────────────────────────────────────────
+    classifyBtn.addEventListener('click', async () => {
+      classifyBtn.disabled = true;
+      statusEl.className = '';
+      statusEl.textContent = 'Klassifizierung läuft… (kann einige Sekunden dauern)';
+
+      try {
+        const response = await fetch('/classify', { method: 'POST' });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ detail: response.statusText }));
+          throw new Error(err.detail || response.statusText);
+        }
+        const data = await response.json();
+        applyClassifications(data.classifications);
+        statusEl.textContent = 'Klassifizierung abgeschlossen.';
+      } catch (err) {
+        statusEl.textContent = err.message;
+        statusEl.className = 'error';
+      } finally {
+        classifyBtn.disabled = false;
+      }
+    });
+
+    // ── Link ──────────────────────────────────────────────────────────────
+    linkBtn.addEventListener('click', async () => {
+      linkBtn.disabled = true;
+      statusEl.className = '';
+      statusEl.textContent = 'Verlinkung läuft…';
+
+      try {
+        const response = await fetch('/link', { method: 'POST' });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ detail: response.statusText }));
+          throw new Error(err.detail || response.statusText);
+        }
+        const data = await response.json();
+        renderLinkedCards(data.entries);
+        statusEl.textContent = 'Verlinkung abgeschlossen.';
+        dashboardBtn.style.display = 'inline-block';
+      } catch (err) {
+        statusEl.textContent = err.message;
+        statusEl.className = 'error';
+      } finally {
+        linkBtn.disabled = false;
+      }
+    });
+
+    // ── Summarize ─────────────────────────────────────────────────────────
+    summarizeBtn.addEventListener('click', async () => {
+      summarizeBtn.disabled = true;
+      statusEl.className = '';
+      statusEl.textContent = 'Zusammenfassung läuft… (kann einige Sekunden dauern)';
+
+      try {
+        const response = await fetch('/summarize', { method: 'POST' });
+        if (!response.ok) {
+          const err = await response.json().catch(() => ({ detail: response.statusText }));
+          throw new Error(err.detail || response.statusText);
+        }
+        const data = await response.json();
+        renderSummaryCards(data.summaries);
+        statusEl.textContent = 'Zusammenfassung abgeschlossen.';
+        // Show link button once summaries are available
+        linkBtn.style.display = 'inline-block';
+      } catch (err) {
+        statusEl.textContent = err.message;
+        statusEl.className = 'error';
+      } finally {
+        summarizeBtn.disabled = false;
+      }
+    });
+
+    // ── Render collapsible summary cards ─────────────────────────────────
+    function renderSummaryCards(summaries) {
+      summaryCards.innerHTML = '';
+      if (!summaries || summaries.length === 0) {
+        summaryCards.innerHTML = '<p class="empty-note">Keine Zusammenfassungen vorhanden.</p>';
+        summariesSection.style.display = 'block';
+        return;
+      }
+      summaries.forEach(s => {
+        const bodyHtml = s.topics && s.topics.length > 0
+          ? renderTopicsHtml(s.topics)
+          : renderFlatFactsHtml(s.key_facts);
+
+        const card = document.createElement('details');
+        card.className = 'summary-card';
+        card.setAttribute('open', '');
+        card.innerHTML = `
+          <summary>${escHtml(s.filename)}</summary>
+          <div class="summary-body">
+            <p>${escHtml(s.summary)}</p>
+            ${bodyHtml}
+          </div>`;
+        summaryCards.appendChild(card);
+      });
+      summariesSection.style.display = 'block';
+    }
+
+    function renderTopicsHtml(topics) {
+      return topics.map(t => {
+        const sidesHtml = t.sides.map((side, idx) => {
+          const cls = idx === 0 ? 'topic-side-a' : 'topic-side-b';
+          const pointsHtml = side.points.length > 0
+            ? '<ul>' + side.points.map(p => `<li>${escHtml(p)}</li>`).join('') + '</ul>'
+            : '<p class="empty-note" style="margin:0">—</p>';
+          return `<div class="topic-side ${cls}">
+            <div class="topic-side-label" title="${escHtml(side.side)}">${escHtml(side.side)}</div>
+            ${pointsHtml}
+          </div>`;
+        }).join('');
+        return `<div class="topic-block">
+          <div class="topic-title">${escHtml(t.title)}</div>
+          <div class="topic-sides">${sidesHtml}</div>
+        </div>`;
+      }).join('');
+    }
+
+    function renderFlatFactsHtml(key_facts) {
+      if (!key_facts || key_facts.length === 0)
+        return '<p class="empty-note">Keine Key Facts extrahiert.</p>';
+      return '<strong>Key Facts:</strong><ul>' +
+        key_facts.map(f => `<li>${escHtml(f)}</li>`).join('') + '</ul>';
+    }
+
+    // ── Category → CSS class mapping ─────────────────────────────────────
+    const CATEGORY_CLASS = {
+      'Foto':         'badge-foto',
+      'Vertrag':      'badge-vertrag',
+      'Rechnung':     'badge-rechnung',
+      'Unterschrift': 'badge-unterschrift',
+      'Sonstiges':    'badge-sonstiges',
+    };
+
+    function catBadgeHtml(category) {
+      const cls = CATEGORY_CLASS[category] || 'badge-sonstiges';
+      return `<span class="badge ${cls}">${category}</span>`;
+    }
+
+    // ── Apply classification results to existing list items ───────────────
+    function applyClassifications(classifications) {
+      const ul = document.getElementById('list-other');
+      // Build a map for quick lookup
+      const map = {};
+      classifications.forEach(c => { map[c.filename] = c; });
+
+      // Replace each <li> in the other-files list with a richer .file-item div
+      const items = Array.from(ul.querySelectorAll('.file-item, li'));
+      items.forEach(item => {
+        const name = item.dataset.filename || item.textContent.trim();
+        if (!name) return;
+        const result = map[name];
+        item.outerHTML = buildFileItem(name, result);
+      });
+    }
+
+    function buildFileItem(name, result) {
+      const badgeHtml  = result ? catBadgeHtml(result.category) : '';
+      const noteHtml   = result ? `<span class="confidence" title="${escHtml(result.confidence_note)}">${escHtml(result.confidence_note)}</span>` : '';
+      return `<div class="file-item" data-filename="${escHtml(name)}">
+        <span class="filename">${escHtml(name)}</span>
+        <span class="cat-badge">${badgeHtml}</span>
+        ${noteHtml}
+      </div>`;
+    }
+
+    // ── Render linked report cards ────────────────────────────────────────
+    function renderLinkedCards(entries) {
+      linkedCards.innerHTML = '';
+      if (!entries || entries.length === 0) {
+        linkedCards.innerHTML = '<p class="empty-note">Keine verlinkten Einträge vorhanden.</p>';
+        linkedSection.style.display = 'block';
+        return;
+      }
+      entries.forEach(entry => {
+        let evidenceHtml;
+        if (entry.evidence_links && entry.evidence_links.length > 0) {
+          evidenceHtml = entry.evidence_links.map(ev =>
+            `<div class="evidence-item">
+              <span class="filename">${escHtml(ev.filename)}</span>
+              ${catBadgeHtml(ev.category)}
+              <span class="confidence" title="${escHtml(ev.confidence_note)}">${escHtml(ev.confidence_note)}</span>
+            </div>`
+          ).join('');
+        } else {
+          evidenceHtml = '<p class="no-evidence">Keine Nachweise im Text referenziert.</p>';
+        }
+
+        const card = document.createElement('details');
+        card.className = 'linked-card';
+        card.innerHTML = `
+          <summary>
+            ${escHtml(entry.filename)}
+            <span class="badge badge-md" style="margin-left:8px">${entry.evidence_links ? entry.evidence_links.length : 0} Nachweise</span>
+          </summary>
+          <div class="linked-body">
+            <p>${escHtml(entry.summary)}</p>
+            <div class="evidence-list">
+              <h4>Verlinkte Nachweise</h4>
+              ${evidenceHtml}
+            </div>
+          </div>`;
+        linkedCards.appendChild(card);
+      });
+      linkedSection.style.display = 'block';
+    }
+
+    function escHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
+    // ── Render buckets after upload ───────────────────────────────────────
+    function renderUploadResults(data) {
+      renderBucket('list-md', 'count-md', data.md_files, false);
+      renderBucket('list-other', 'count-other', data.other_files, true);
+      results.style.display = 'block';
+    }
+
+    function renderBucket(listId, countId, names, asFileItems) {
+      const ul = document.getElementById(listId);
+      const badge = document.getElementById(countId);
+      ul.innerHTML = '';
+      badge.textContent = names.length;
+      if (names.length === 0) {
+        ul.innerHTML = '<li class="empty-note">Keine Dateien in diesem Bucket.</li>';
+        return;
+      }
+      if (asFileItems) {
+        names.forEach(name => {
+          ul.insertAdjacentHTML('beforeend', buildFileItem(name, null));
+        });
+      } else {
+        names.forEach(name => {
+          const li = document.createElement('li');
+          li.textContent = name;
+          ul.appendChild(li);
+        });
+      }
+    }
+  </script>
+
+</body>
+</html>
