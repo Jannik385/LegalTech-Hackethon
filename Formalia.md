@@ -12,18 +12,9 @@
             
     2. Materiell- rechtlich (Schriftsätze: Beweise, Begründungen)
         
-        → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-        → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-        
         1. Minderung
             
-            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-            
             1. Eröffnung des Mängelgewährleistungsrechts
-                
-                → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
                 
                 1. Wirksamer Mietvertrag, § 535 BGB
                     
@@ -42,18 +33,12 @@
                     
                 4. Kein Ausschluss
                     
-                    → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                    → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-                    
                     1. Vertraglich (Beachte: § 536b BGB)
                         
                         → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
                         → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
                         
                     2. Gesetzlich
-                        
-                        → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                        → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
                         
                         1. Kenntnis, § 536b BGB
                             
@@ -67,9 +52,6 @@
                             
             2. Rechtsfolge
                 
-                → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-                
                 1. Herabsetzung des Anspruchs auf Mietzahlung (Minderungsquotenvorschlag abgeleitet aus typischer aktueller Rechtssprechung und aktuellen Mietminderungstabellen)
                     
                     → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
@@ -82,18 +64,9 @@
                     
         2. Rücktritt
             
-            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-            
             1. Grundsätzlich § 542 ff. BGB
                 
-                → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-                
                 1. Vermieter
-                    
-                    → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                    → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
                     
                     1. Ordentlich: § 542 Abs. 1 BGB (Beachte: §§ 573, 573a BGB)
                         
@@ -102,13 +75,7 @@
                         
                     2. Außerordentlich:
                         
-                        → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                        → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-                        
                         1. Fristlos:
-                            
-                            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
                             
                             - §§ 543 Abs. 1, 2 Nr. 2 und 3 BGB
                                 
@@ -127,9 +94,6 @@
                             
                 2. Mieter
                     
-                    → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                    → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-                    
                     1. Ordentlich: § 542 Abs. 1 BGB
                         
                         → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
@@ -137,13 +101,7 @@
                         
                     2. Außerordentlich:
                         
-                        → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                        → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
-                        
                         1. Fristlos:
-                            
-                            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
-                            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
                             
                             - §§ 543 Abs. 1, 2 Nr. 2 BGB
                                 
