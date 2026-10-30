@@ -406,13 +406,24 @@ _LEAF_IDS: list[str] = [n[0] for n in FORMALIA_LEAF_NODES]
 # ---------------------------------------------------------------------------
 
 
+class SeitenReview(BaseModel):
+    side: str             # party name (from filename)
+    subsumtion: str       # LLM-filled or "nicht behandelt"
+    zwischenergebnis: str # LLM-filled or "offen"
+
+
+class TatbestandsmerkmalReview(BaseModel):
+    label: str                    # hardcoded merkmal label
+    definition: str               # hardcoded definition text
+    sides: list[SeitenReview]     # always 2 entries: [side_a, side_b]
+
+
 class LeafNodeReview(BaseModel):
     """Filled review for one leaf node in the Formalia skeleton."""
     node_id: str
     label: str
     path: str
-    aus_dem_schriftsatz: str   # what the brief argues / "nicht behandelt"
-    beweise_begruendungen: str # evidence / reasoning cited / "fehlen"
+    merkmale: list[TatbestandsmerkmalReview]
 
 
 class FormaliaSkeleton(BaseModel):
