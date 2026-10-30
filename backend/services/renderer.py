@@ -21,11 +21,12 @@ Usage::
 
 from __future__ import annotations
 
+import re
 from datetime import datetime, timezone
 from html import escape
 from backend.services.linker import LinkedReport, LinkedSummary
 from backend.services.classifier import ClassificationResult
-from backend.services.summarizer import FormaliaSkeleton
+from backend.services.summarizer import FormaliaSkeleton, Topic
 
 
 # ---------------------------------------------------------------------------
@@ -198,15 +199,79 @@ def _render_formalia_skeleton_section(skeleton: FormaliaSkeleton) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Citation linker & law-badge helpers
+# ---------------------------------------------------------------------------
+
+_CITATION_RE = re.compile(r'\(([A-Za-z]\d+(?:\.md)?)\)', re.IGNORECASE)
+
+
+def _link_citations(text: str, md_filenames: set[str]) -> str:
+    """HTML-escape *text* and turn (M09)/(M09.md) refs into openFileModal buttons."""
+    escaped = escape(text)
+
+    def _replace(m: re.Match) -> str:
+        ref = m.group(1)
+        ref_base = re.sub(r'\.md$', '', ref, flags=re.IGNORECASE).upper()
+        found = next(
+            (fn for fn in md_filenames if fn.replace('.md', '').upper() == ref_base),
+            None,
+        )
+        if not found:
+            return m.group(0)  # already escaped via escape() above
+        safe = found.replace('&', '&amp;').replace('"', '&quot;').replace("'", '&#39;')
+        return (
+            f'<button onclick="openFileModal(\'{safe}\')" '
+            f'style="color:#7c5cd8;cursor:pointer;text-decoration:none;background:none;'
+            f'border:none;padding:0;font:inherit;font-weight:600;font-size:0.82em;'
+            f'border-bottom:1px dashed #7c5cd8">({escape(ref)})</button>'
+        )
+
+    return _CITATION_RE.sub(_replace, escaped)
+
+
+def _law_badges_html(topics: list[Topic]) -> str:
+    """Return a row of .law-badge chips collected from all topics, or empty string."""
+    seen: set[str] = set()
+    chips: list[str] = []
+    for topic in topics:
+        defs = topic.law_definitions or {}
+        for law in topic.relevant_law or []:
+            if law in seen:
+                continue
+            seen.add(law)
+            entries = defs.get(law, [])
+            if entries:
+                tip_text = '\n\n'.join(
+                    f'{label}:\n{definition}' for label, definition in entries
+                )
+                chips.append(
+                    f'<span class="law-badge" data-tooltip="{escape(tip_text)}">'
+                    f'{escape(law)}</span>'
+                )
+            else:
+                chips.append(f'<span class="law-badge">{escape(law)}</span>')
+    if not chips:
+        return ''
+    return (
+        '<div style="margin:6px 0 8px;display:flex;flex-wrap:wrap;gap:4px">'
+        + ''.join(chips)
+        + '</div>'
+    )
+
+
+# ---------------------------------------------------------------------------
 # Summary section renderer
 # ---------------------------------------------------------------------------
 
 
-def _render_summary_section(entry: LinkedSummary) -> str:
+def _render_summary_section(entry: LinkedSummary, md_filenames: set[str]) -> str:
     """Render one summary card with its evidence anchor links."""
+    badges_html = _law_badges_html(entry.topics)
     facts_html = ""
     if entry.key_facts:
-        items = "".join(f"<li>{escape(f)}</li>" for f in entry.key_facts)
+        items = "".join(
+            f"<li>{_link_citations(f, md_filenames)}</li>" for f in entry.key_facts
+        )
         facts_html = f'<ul style="margin:8px 0 0 0;padding-left:20px">{items}</ul>'
     else:
         facts_html = '<p style="color:#57606a;font-size:0.875rem;font-style:italic">Keine Key Facts extrahiert.</p>'
@@ -253,6 +318,7 @@ def _render_summary_section(entry: LinkedSummary) -> str:
         f'{escape(entry.filename)}</button></h2>'
         f'<p style="margin:0 0 8px;color:#374151;line-height:1.6">{escape(entry.summary)}</p>'
         f'<strong style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.04em;color:#57606a">Key Facts</strong>'
+        f"{badges_html}"
         f"{facts_html}"
         f"{evidence_html}"
         f"{template_block}"
@@ -289,6 +355,9 @@ def render_dashboard(linked_report: LinkedReport) -> str:
     """
     timestamp = datetime.now(tz=timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
 
+    # ── MD filenames set (for citation linking) ───────────────────────────
+    md_filenames: set[str] = {entry.filename for entry in linked_report.entries}
+
     # ── Formalia skeleton section (from first entry that has one) ─────────
     skeleton_section = ""
     for entry in linked_report.entries:
@@ -298,7 +367,7 @@ def render_dashboard(linked_report: LinkedReport) -> str:
 
     # ── Summary sections ──────────────────────────────────────────────────
     summary_sections = "".join(
-        _render_summary_section(entry) for entry in linked_report.entries
+        _render_summary_section(entry, md_filenames) for entry in linked_report.entries
     )
     if not summary_sections:
         summary_sections = (
@@ -414,6 +483,49 @@ def render_dashboard(linked_report: LinkedReport) -> str:
       white-space: pre-wrap;
       word-break: break-word;
       color: #374151;
+    }}
+    .law-badge {{
+      display: inline-block;
+      font-size: 0.68rem;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 10px;
+      background: #e5e7eb;
+      color: #374151;
+      white-space: nowrap;
+      margin-right: 4px;
+    }}
+    .law-badge[data-tooltip] {{
+      position: relative;
+      cursor: help;
+      border-bottom: 1px dotted #6b7280;
+    }}
+    .law-badge[data-tooltip]::after {{
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 280px;
+      max-height: 260px;
+      overflow-y: auto;
+      background: #1f2328;
+      color: #f3f4f6;
+      font-size: 0.72rem;
+      font-weight: 400;
+      line-height: 1.5;
+      padding: 8px 10px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      z-index: 100;
+    }}
+    .law-badge[data-tooltip]:hover::after {{
+      opacity: 1;
     }}
   </style>
 </head>
