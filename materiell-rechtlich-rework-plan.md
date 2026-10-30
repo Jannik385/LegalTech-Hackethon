@@ -1,12 +1,12 @@
-# Plan: Rework Materiell-rechtlich Summary Structure
+# Plan: Rework Summary Structure — Formell-rechtlich & Materiell-rechtlich
 
 ## Top-Level Overview
 
-The file `Formalia.md` defines a fixed legal review outline used as a template.  
-When a lawyer's brief (Markdown file) is fed as input, a **summary** must be generated.  
-That summary must **not** invent chapters from the brief — instead, it must walk every single node of the `2. Materiell-rechtlich` hierarchy in `Formalia.md` (at every depth level) and review the brief against each node.
+The file `Formalia.md` defines a fixed legal review outline used as a template.
+When a lawyer's brief (Markdown file) is fed as input, a **summary** must be generated.
+That summary must **not** invent chapters from the brief — instead, it must walk every single node of **both** `1. Formell-rechtlich` and `2. Materiell-rechtlich` in `Formalia.md` (at every depth level) and review the brief against each node.
 
-The result: a structured output that mirrors the `2. Materiell-rechtlich` outline exactly, with each node containing a review of what the brief says (or doesn't say) about that specific legal element.
+The result: a structured output that mirrors the full outline exactly, with each node containing a review of what the brief says (or doesn't say) about that specific legal element.
 
 ---
 
@@ -14,7 +14,13 @@ The result: a structured output that mirrors the `2. Materiell-rechtlich` outlin
 
 - The `Formalia.md` outline is the **fixed skeleton** — it is never modified.
 - The input brief is the **source material** to be reviewed against the skeleton.
-- The summary output preserves the **exact hierarchy** of `2. Materiell-rechtlich`, including every level, e.g.:
+- The summary output preserves the **exact hierarchy** of **both sections**, including every level.
+- `1. Formell-rechtlich` hierarchy (all leaf nodes):
+  - `1.1 Ladung § 377 ZPO und Ladungsfrist § 217, 214 ZPO`
+  - `1.2 Zustellung § 166 Abs. 1 ZPO`
+  - `1.3 Frist § 222 Abs. 1 ZPO`
+  - `1.4 Verjährung § 194-218 BGB`
+- `2. Materiell-rechtlich` hierarchy (all leaf nodes), including every level, e.g.:
   - `2.1 Minderung`
     - `2.1.1 Eröffnung des Mängelgewährleistungsrechts`
       - `2.1.1.1 Wirksamer Mietvertrag, § 535 BGB`
@@ -72,11 +78,40 @@ Expand every leaf node (and intermediate node) in the `2. Materiell-rechtlich` s
 
 ---
 
+---
+
+### Sub-Task 2: Add placeholders to `1. Formell-rechtlich` in `Formalia.md`
+
+**Intent**
+Apply the same review placeholder pattern to every node in `1. Formell-rechtlich`, so briefs are reviewed against procedural law points as well as substantive law points.
+
+**Expected Outcomes**
+- All 4 nodes in `1. Formell-rechtlich` have the two placeholder lines beneath them:
+  `→ Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]`
+  `→ Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]`
+- All 4 nodes are leaf nodes — no intermediate node logic needed.
+- `2. Materiell-rechtlich` and `3. Hauptverhandlung` are untouched.
+
+**Todo List**
+- [ ] Add the two placeholder lines under each of the 4 nodes in `1. Formell-rechtlich`:
+  - `Ladung § 377 ZPO und Ladungsfrist § 217, 214 ZPO`
+  - `Zustellung § 166 Abs. 1 ZPO`
+  - `Frist § 222 Abs. 1 ZPO`
+  - `Verjährung § 194-218 BGB`
+- [ ] Do NOT modify `2. Materiell-rechtlich` or `3. Hauptverhandlung`.
+
+**Relevant Context**
+- File: [`Formalia.md`](Formalia.md) — lines 3–11 are the full `1. Formell-rechtlich` block.
+
+**Status**: `[ ] pending`
+
+---
+
 ## Open Questions / Decisions Already Confirmed
 
 | Question | Answer |
 |---|---|
 | Should new chapters be invented from brief content? | **No** — the skeleton is fixed. |
-| Should every depth level get a review slot? | **Only leaf nodes** — intermediate nodes (with subchapters) are named but hold no placeholders. |
-| Should `1. Formell-rechtlich` be changed too? | **No** — only `2. Materiell-rechtlich`. |
+| Should every depth level get a review slot? | **Only leaf nodes** — intermediate nodes with subchapters are named but hold no placeholders. |
+| Should `1. Formell-rechtlich` be changed too? | **Yes** — added in Sub-Task 2. |
 | What language for the placeholders? | **German** — consistent with the document. |

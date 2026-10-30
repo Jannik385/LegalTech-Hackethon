@@ -4,11 +4,23 @@
         
         1. Ladung § 377 ZPO und Ladungsfrist § 217, 214 ZPO
             
+            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
+            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
+            
         2. Zustellung § 166 Abs. 1 ZPO
+            
+            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
+            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
             
         3. Frist § 222 Abs. 1 ZPO
             
+            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
+            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
+            
         4. verjährung § 194-218 BGB
+            
+            → Aus dem Schriftsatz: [Zusammenfassung des Arguments / nicht behandelt]
+            → Beweise / Begründungen: [Belege aus dem Schriftsatz / fehlen]
             
     2. Materiell- rechtlich (Schriftsätze: Beweise, Begründungen)
         
