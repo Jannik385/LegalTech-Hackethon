@@ -55,7 +55,7 @@ FORMALIA_LEAF_NODES: list[tuple[str, str, str]] = [
      "2.1 Minderung > 2.1.1 Eröffnung des Mängelgewährleistungsrechts"),
     # 2.1.1.4 Kein Ausschluss
     ("kein_ausschluss_vertraglich", "Vertraglich (Beachte: § 536b BGB)",
-     "2.1 Minderung > 2.1.1 Eröffnung > 2.1.1.4 Kein Ausschluss"),
+     "2.1 Minderung > 2.1.1 Eröffnung > 2.1.1.4 Kein Ausschluss > Vertraglich"),
     ("kenntnis",                    "Kenntnis, § 536b BGB",
      "2.1 Minderung > 2.1.1 Eröffnung > 2.1.1.4 Kein Ausschluss > Gesetzlich"),
     ("unterlassene_maenzelanzeige", "Unterlassene Mängelanzeige, § 536c BGB",
