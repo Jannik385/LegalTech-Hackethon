@@ -103,7 +103,7 @@ Apply the same review placeholder pattern to every node in `1. Formell-rechtlich
 **Relevant Context**
 - File: [`Formalia.md`](Formalia.md) — lines 3–11 are the full `1. Formell-rechtlich` block.
 
-**Status**: `[ ] pending`
+**Status**: `[x] done`
 
 ---
 
