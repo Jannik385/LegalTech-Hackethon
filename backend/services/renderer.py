@@ -71,18 +71,27 @@ def _badge(category: str) -> str:
 # Formalia skeleton renderer
 # ---------------------------------------------------------------------------
 
-_STATUS_TREATED = "background:#d1fae5;color:#065f46"
-_STATUS_MISSING  = "background:#fee2e2;color:#991b1b"
+_BADGE_ZE_STYLES: dict[str, str] = {
+    "erfüllt":         "background:#d1fae5;color:#065f46",
+    "nicht erfüllt":   "background:#fee2e2;color:#991b1b",
+    "streitig":        "background:#fef9c3;color:#92400e",
+}
+_BADGE_ZE_DEFAULT = "background:#f3f4f6;color:#374151"
+_BADGE_ZE_GREY_VALUES = {"offen", "nicht behandelt", ""}
 
 
-def _status_badge(text: str) -> str:
-    """Small coloured badge: green for content, red for 'nicht behandelt'/'fehlen'."""
-    is_empty = text.strip().lower() in ("nicht behandelt", "fehlen", "")
-    style = _STATUS_MISSING if is_empty else _STATUS_TREATED
-    label = "nicht behandelt" if is_empty else "behandelt"
+def _zwischenergebnis_badge(text: str) -> str:
+    """Colour-coded badge for a Zwischenergebnis value."""
+    normalised = text.strip().lower()
+    if normalised in _BADGE_ZE_GREY_VALUES:
+        style = _BADGE_ZE_DEFAULT
+        label = text.strip() or "offen"
+    else:
+        style = _BADGE_ZE_STYLES.get(normalised, _BADGE_ZE_DEFAULT)
+        label = text.strip()
     return (
-        f'<span style="display:inline-block;padding:1px 8px;border-radius:10px;'
-        f'font-size:0.72rem;font-weight:600;{style};margin-left:6px">{label}</span>'
+        f'<span style="display:inline-block;padding:2px 10px;border-radius:10px;'
+        f'font-size:0.72rem;font-weight:600;{style};margin-top:6px">{escape(label)}</span>'
     )
 
 
@@ -91,56 +100,94 @@ def _render_formalia_skeleton_section(skeleton: FormaliaSkeleton) -> str:
     if not skeleton.nodes:
         return ""
 
-    # Group nodes by their hierarchy path
+    # Derive column header names from the first node that has merkmale with sides
+    side_a_name = "Seite A"
+    side_b_name = "Seite B"
+    for _n in skeleton.nodes:
+        if _n.merkmale and len(_n.merkmale[0].sides) >= 2:
+            side_a_name = _n.merkmale[0].sides[0].side
+            side_b_name = _n.merkmale[0].sides[1].side
+            break
+
     rows_html = ""
     current_path = None
     for node in skeleton.nodes:
+        # Path header row (groups nodes by hierarchy)
         if node.path != current_path:
             current_path = node.path
             rows_html += (
-                f'<tr><td colspan="3" style="padding:10px 12px 4px;background:#f7f8fa;'
+                f'<tr><td colspan="2" style="padding:10px 12px 4px;background:#f7f8fa;'
                 f'font-size:0.75rem;font-weight:700;color:#57606a;text-transform:uppercase;'
                 f'letter-spacing:0.05em;border-bottom:1px solid #e5e7eb">'
                 f'{escape(node.path)}</td></tr>'
             )
 
-        is_missing_schriftsatz = node.aus_dem_schriftsatz.strip().lower() in ("nicht behandelt", "")
-        is_missing_beweis      = node.beweise_begruendungen.strip().lower() in ("fehlen", "")
-        row_bg = "#fff8f8" if (is_missing_schriftsatz and is_missing_beweis) else "#ffffff"
-
+        # Node title row
         rows_html += (
-            f'<tr style="background:{row_bg}">'
-            # Leaf node label
-            f'<td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;'
-            f'font-weight:600;font-size:0.85rem;color:#1f2328;white-space:nowrap;width:26%">'
-            f'{escape(node.label)}{_status_badge(node.aus_dem_schriftsatz)}</td>'
-            # Aus dem Schriftsatz
-            f'<td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;'
-            f'font-size:0.85rem;color:{"#b91c1c" if is_missing_schriftsatz else "#374151"};width:37%">'
-            f'{escape(node.aus_dem_schriftsatz)}</td>'
-            # Beweise / Begründungen
-            f'<td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;'
-            f'font-size:0.85rem;color:{"#b91c1c" if is_missing_beweis else "#374151"};width:37%">'
-            f'{escape(node.beweise_begruendungen)}</td>'
-            f'</tr>'
+            f'<tr><td colspan="2" style="padding:10px 12px 6px;'
+            f'font-weight:700;font-size:0.88rem;color:#1f2328;'
+            f'border-bottom:1px solid #e5e7eb;background:#ffffff">'
+            f'{escape(node.label)}</td></tr>'
         )
+
+        if node.merkmale:
+            for merkmal in node.merkmale:
+                # Definition row — full-width, subdued
+                rows_html += (
+                    f'<tr><td colspan="2" style="padding:6px 12px 6px 20px;'
+                    f'background:#f7f8fa;font-size:0.78rem;font-style:italic;color:#57606a;'
+                    f'border-bottom:1px solid #e5e7eb">'
+                    f'<strong style="font-style:normal">{escape(merkmal.label)}</strong>'
+                    f': {escape(merkmal.definition)}</td></tr>'
+                )
+
+                # Two-column Subsumtion row
+                side_a = merkmal.sides[0] if len(merkmal.sides) > 0 else None
+                side_b = merkmal.sides[1] if len(merkmal.sides) > 1 else None
+
+                def _side_cell(sr) -> str:  # type: ignore[no-untyped-def]
+                    if sr is None:
+                        return (
+                            '<td style="padding:8px 12px 10px;border-bottom:1px solid #f0f0f0;'
+                            'vertical-align:top;font-size:0.83rem;color:#b91c1c;width:50%">'
+                            'keine Daten</td>'
+                        )
+                    return (
+                        f'<td style="padding:8px 12px 10px;border-bottom:1px solid #f0f0f0;'
+                        f'vertical-align:top;font-size:0.83rem;color:#374151;width:50%">'
+                        f'{escape(sr.subsumtion)}'
+                        f'<div style="margin-top:6px">'
+                        f'<span style="font-size:0.72rem;color:#57606a;font-weight:600;'
+                        f'text-transform:uppercase;letter-spacing:0.04em">Zwischenergebnis&nbsp;</span>'
+                        f'{_zwischenergebnis_badge(sr.zwischenergebnis)}'
+                        f'</div>'
+                        f'</td>'
+                    )
+
+                rows_html += (
+                    f'<tr style="background:#ffffff">'
+                    f'{_side_cell(side_a)}'
+                    f'{_side_cell(side_b)}'
+                    f'</tr>'
+                )
 
     return (
         '<section style="margin-bottom:40px">'
         '<h2 style="font-size:1.05rem;font-weight:700;margin:0 0 4px;color:#1f2328;'
         'padding-bottom:8px;border-bottom:2px solid #e5e7eb">2. Materiell-rechtlich — Prüfungsrahmen</h2>'
         '<p style="margin:0 0 14px;font-size:0.8rem;color:#57606a">'
-        'Jeder Prüfungspunkt aus dem Gliederungsrahmen (Formalia.md) — bewertet anhand der hochgeladenen Schriftsätze.</p>'
+        'Jeder Prüfungspunkt aus dem Gliederungsrahmen (Formalia.md) — bewertet anhand der hochgeladenen Schriftsätze '
+        'nach Tatbestandsmerkmalen (Gutachtenstil).</p>'
         '<div style="overflow-x:auto">'
         '<table style="width:100%;border-collapse:collapse;font-family:inherit">'
         '<thead>'
         '<tr style="background:#f7f8fa">'
-        '<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
-        'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb">Prüfungspunkt</th>'
-        '<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
-        'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb">Aus dem Schriftsatz</th>'
-        '<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
-        'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb">Beweise / Begründungen</th>'
+        f'<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
+        f'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb;width:50%">'
+        f'{escape(side_a_name)}</th>'
+        f'<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
+        f'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb;width:50%">'
+        f'{escape(side_b_name)}</th>'
         '</tr>'
         '</thead>'
         f'<tbody>{rows_html}</tbody>'
