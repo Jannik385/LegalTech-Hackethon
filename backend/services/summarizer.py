@@ -708,6 +708,54 @@ def _parse_overview_response(
 
 
 # ---------------------------------------------------------------------------
+# Party detection
+# ---------------------------------------------------------------------------
+
+_DETECT_SYSTEM = (
+    "Du bist ein juristischer Assistent. "
+    "Lies die beiden folgenden Schriftsatz-Ausschnitte und ermittle, "
+    "welcher Parteiname der Kläger und welcher der Beklagte ist. "
+    "Antworte ausschließlich mit einem JSON-Objekt ohne weiteren Text:\n"
+    '{"side_a": "<vollständiger Kläger-Name>", "side_b": "<vollständiger Beklagter-Name>"}'
+)
+
+
+def _detect_parties(content_a: str, content_b: str) -> tuple[str, str]:
+    """Ask the LLM to identify Kläger / Beklagter from the two documents.
+
+    Returns (side_a_label, side_b_label). Falls back to ("Kläger", "Beklagter")
+    on any error or unparseable response.
+    """
+    excerpt_a = content_a[:1_000]
+    excerpt_b = content_b[:1_000]
+    user_msg = (
+        f"## Schriftsatz A\n\n{excerpt_a}\n\n"
+        f"---\n\n"
+        f"## Schriftsatz B\n\n{excerpt_b}"
+    )
+    try:
+        with OpenRouter(api_key=OPENROUTER_API_KEY) as client:
+            res = client.chat.send(
+                model=MODEL,
+                messages=[
+                    {"role": "system", "content": _DETECT_SYSTEM},
+                    {"role": "user",   "content": user_msg},
+                ],
+                stream=False,
+            )
+        raw = res.choices[0].message.content or ""
+        cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw).strip()
+        data = json.loads(cleaned)
+        side_a = str(data.get("side_a", "")).strip()
+        side_b = str(data.get("side_b", "")).strip()
+        if side_a and side_b:
+            return side_a, side_b
+    except Exception:
+        pass
+    return "Kläger", "Beklagter"
+
+
+# ---------------------------------------------------------------------------
 # Template rendering
 # ---------------------------------------------------------------------------
 
@@ -933,10 +981,12 @@ def summarize_all_md(files: dict[str, str]) -> SummaryResult:
         return summarize_md(fname, content)
 
     items = list(files.items())
-    side_a_name, content_a = items[0]
-    side_b_name = items[1][0]
+    _, content_a = items[0]
     # Merge any additional files into side B
     content_b = _FILE_SEPARATOR.join(c for _, c in items[1:])
+
+    # ── Detect party roles via LLM ────────────────────────────────────────
+    side_a_name, side_b_name = _detect_parties(content_a, content_b)
 
     # Build RAG context — retrieve relevant law chunks based on combined content
     rag_context = ""
