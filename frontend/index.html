@@ -331,6 +331,40 @@
       white-space: nowrap;
     }
 
+    /* Tooltip on badges that carry definitions */
+    .law-badge[data-tooltip] {
+      position: relative;
+      cursor: help;
+      border-bottom: 1px dotted #6b7280;
+    }
+    .law-badge[data-tooltip]::after {
+      content: attr(data-tooltip);
+      position: absolute;
+      bottom: calc(100% + 6px);
+      left: 50%;
+      transform: translateX(-50%);
+      width: 280px;
+      max-height: 260px;
+      overflow-y: auto;
+      background: #1f2328;
+      color: #f3f4f6;
+      font-size: 0.72rem;
+      font-weight: 400;
+      line-height: 1.5;
+      padding: 8px 10px;
+      border-radius: 6px;
+      white-space: pre-wrap;
+      word-break: break-word;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.12s ease;
+      z-index: 100;
+    }
+    .law-badge[data-tooltip]:hover::after {
+      opacity: 1;
+    }
+
     /* ── Missing documents panel (per topic) ───────────────────────────── */
     .missing-docs-panel {
       margin-top: 10px;
@@ -725,9 +759,15 @@
     }
 
     function renderTopicBlock(t) {
-      const lawBadges = (t.relevant_law || []).map(l =>
-        `<span class="law-badge">${escHtml(l)}</span>`
-      ).join('');
+      const defs = t.law_definitions || {};
+      const lawBadges = (t.relevant_law || []).map(l => {
+        const entries = defs[l];
+        if (entries && entries.length > 0) {
+          const tipText = entries.map(([label, def]) => label + ':\n' + def).join('\n\n');
+          return `<span class="law-badge" data-tooltip="${escHtml(tipText)}">${escHtml(l)}</span>`;
+        }
+        return `<span class="law-badge">${escHtml(l)}</span>`;
+      }).join('');
       const sidesHtml = t.sides.map((side, idx) => {
         const cls = idx === 0 ? 'topic-side-a' : 'topic-side-b';
         const pointsHtml = side.points.length > 0

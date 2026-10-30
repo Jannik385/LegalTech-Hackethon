@@ -394,6 +394,28 @@ LEAF_NODE_MERKMALE: dict[str, list[tuple[str, str]]] = {
     ],
 }
 
+# ---------------------------------------------------------------------------
+# Lookup: paragraph citation string → Tatbestandsmerkmal definitions
+# Keys are the strings the LLM typically emits in relevant_law (normalised).
+# Values mirror LEAF_NODE_MERKMALE entries; tuples converted to lists for JSON.
+# ---------------------------------------------------------------------------
+PARAGRAPH_DEFINITIONS: dict[str, list[list[str]]] = {
+    "§ 535 BGB":        [[l, d] for l, d in LEAF_NODE_MERKMALE["wirksamer_mietvertrag"]],
+    "§ 536 BGB":        [[l, d] for l, d in LEAF_NODE_MERKMALE["mietmangel"]],
+    "§ 536 Abs. 1 BGB": [[l, d] for l, d in LEAF_NODE_MERKMALE["massgeblicher_zeitpunkt"]],
+    "§ 536b BGB":       [[l, d] for l, d in LEAF_NODE_MERKMALE["kenntnis"]],
+    "§ 536c BGB":       [[l, d] for l, d in LEAF_NODE_MERKMALE["unterlassene_maenzelanzeige"]],
+    "§ 812 BGB":        [[l, d] for l, d in LEAF_NODE_MERKMALE["rueckerstattung"]],
+    "§ 542 BGB":        [[l, d] for l, d in LEAF_NODE_MERKMALE["mieter_ordentlich"]],
+    "§ 542 Abs. 1 BGB": [[l, d] for l, d in LEAF_NODE_MERKMALE["mieter_ordentlich"]],
+    "§ 543 BGB":        [[l, d] for l, d in LEAF_NODE_MERKMALE["mieter_fristlos_543"]],
+    "§§ 543 BGB":       [[l, d] for l, d in LEAF_NODE_MERKMALE["mieter_fristlos_543"]],
+    "§ 569 BGB":        [[l, d] for l, d in LEAF_NODE_MERKMALE["mieter_fristlos_569"]],
+    "§ 569 Abs. 1 BGB": [[l, d] for l, d in LEAF_NODE_MERKMALE["mieter_fristlos_569"]],
+    "§ 569 Abs. 2 BGB": [[l, d] for l, d in LEAF_NODE_MERKMALE["vermieter_fristlos_569"]],
+    "§ 580 BGB":        [[l, d] for l, d in LEAF_NODE_MERKMALE["mieter_befristet"]],
+}
+
 _LEAF_IDS: list[str] = [n[0] for n in FORMALIA_LEAF_NODES]
 
 # ---------------------------------------------------------------------------
@@ -456,6 +478,8 @@ class Topic(BaseModel):
     category: Literal["formellrechtlich", "materiellrechtlich", "hauptverhandlung"] = "materiellrechtlich"
     # Paragraph citations the model relied on (may be empty for Hauptverhandlung)
     relevant_law: list[str] = []
+    # Tatbestandsmerkmal definitions keyed by paragraph string (subset of relevant_law)
+    law_definitions: dict[str, list[list[str]]] = {}
     # Missing documents relevant to this specific topic, per side
     missing_documents: list[MissingDocument] = []
 
@@ -666,11 +690,17 @@ def _parse_overview_response(
             if side and items:
                 topic_missing.append(MissingDocument(side=side, items=items))
         if title and sides:
+            law_definitions = {
+                law: PARAGRAPH_DEFINITIONS[law]
+                for law in relevant_law
+                if law in PARAGRAPH_DEFINITIONS
+            }
             topics.append(Topic(
                 title=title,
                 sides=sides,
                 category=category,  # type: ignore[arg-type]
                 relevant_law=relevant_law,
+                law_definitions=law_definitions,
                 missing_documents=topic_missing,
             ))
 
