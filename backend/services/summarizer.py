@@ -541,7 +541,7 @@ Untergliedert in:
   - Mietmangel: § 534 BGB
   - Maßgeblicher Zeitpunkt (bei/nach Gebrauchsüberlassung): § 536 Abs. 1 BGB
   - Kein Ausschluss: vertraglich (§ 536b BGB), gesetzlich (Kenntnis § 536b BGB, unterlassene Mängelanzeige § 536c BGB)
-- Rechtsfolge:
+- Rechtsfolge (§ 812 BGB gilt ausschließlich hier — niemals bei anderen Streitpunkten verwenden):
   - Herabsetzung des Mietzahlungsanspruchs (Minderungsquote nach aktueller Rspr. und Mietminderungstabellen)
   - Rückerstattung der ungeminderten Miete: § 812 BGB
 
@@ -595,7 +595,7 @@ def _overview_system_prompt(side_a: str, side_b: str, rag_context: str = "") -> 
         '    {\n'
         '      "title": "<Streitpunkt-Titel>",\n'
         '      "category": "materiellrechtlich",\n'
-        '      "relevant_law": ["§ 536 BGB", "§ 812 BGB"],\n'
+        '      "relevant_law": ["§ 536 BGB"],\n'
         '      "sides": [\n'
         f'        {{"side": "{side_a}", "points": ["<Argument 1>", "<Argument 2>"]}},\n'
         f'        {{"side": "{side_b}", "points": ["<Argument 1>", "<Argument 2>"]}}\n'
