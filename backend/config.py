@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
-load_dotenv()
+load_dotenv(override=True)
 
 # AI model — swap here to change the model for all services
 MODEL = "anthropic/claude-haiku-5.5"
