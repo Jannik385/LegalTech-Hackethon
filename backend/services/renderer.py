@@ -246,7 +246,11 @@ def _render_summary_section(entry: LinkedSummary) -> str:
     return (
         '<section style="margin-bottom:28px;padding:20px 24px;background:#fff;border:1px solid #e5e7eb;'
         'border-radius:8px;box-shadow:0 1px 3px rgba(0,0,0,0.04)">'
-        f'<h2 style="margin:0 0 10px;font-size:1rem;font-weight:700;color:#1f2328">{escape(entry.filename)}</h2>'
+        f'<h2 style="margin:0 0 10px;font-size:1rem;font-weight:700;color:#1f2328">'
+        f'<button onclick="openFileModal(\'{escape(entry.filename)}\')" '
+        f'style="background:none;border:none;padding:0;font:inherit;font-weight:700;'
+        f'color:#3b82d4;cursor:pointer;text-decoration:underline;text-underline-offset:2px">'
+        f'{escape(entry.filename)}</button></h2>'
         f'<p style="margin:0 0 8px;color:#374151;line-height:1.6">{escape(entry.summary)}</p>'
         f'<strong style="font-size:0.85rem;text-transform:uppercase;letter-spacing:0.04em;color:#57606a">Key Facts</strong>'
         f"{facts_html}"
@@ -350,6 +354,67 @@ def render_dashboard(linked_report: LinkedReport) -> str:
     a:hover {{ text-decoration: underline; }}
     details > summary {{ list-style: none; }}
     details > summary::-webkit-details-marker {{ display: none; }}
+    #file-modal {{
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,0.55);
+      z-index: 1000;
+      align-items: center;
+      justify-content: center;
+    }}
+    #file-modal.open {{ display: flex; }}
+    #file-modal-box {{
+      background: #fff;
+      border-radius: 8px;
+      width: min(780px, 92vw);
+      max-height: 82vh;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 8px 32px rgba(0,0,0,0.18);
+    }}
+    #file-modal-header {{
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 14px 20px;
+      border-bottom: 1px solid #e5e7eb;
+      gap: 12px;
+    }}
+    #file-modal-title {{
+      margin: 0;
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: #1f2328;
+      word-break: break-all;
+    }}
+    #file-modal-close {{
+      flex-shrink: 0;
+      background: none;
+      border: none;
+      font-size: 1.3rem;
+      line-height: 1;
+      color: #57606a;
+      cursor: pointer;
+      padding: 2px 6px;
+      border-radius: 4px;
+    }}
+    #file-modal-close:hover {{ background: #f3f4f6; color: #1f2328; }}
+    #file-modal-body {{
+      overflow-y: auto;
+      padding: 20px;
+      flex: 1;
+    }}
+    #file-modal-pre {{
+      margin: 0;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+      font-size: 0.8rem;
+      line-height: 1.6;
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #374151;
+    }}
   </style>
 </head>
 <body>
@@ -389,6 +454,45 @@ def render_dashboard(linked_report: LinkedReport) -> str:
     {gallery_section}
 
   </main>
+
+  <div id="file-modal" role="dialog" aria-modal="true" aria-labelledby="file-modal-title">
+    <div id="file-modal-box">
+      <div id="file-modal-header">
+        <h3 id="file-modal-title"></h3>
+        <button id="file-modal-close" aria-label="Schließen">&#215;</button>
+      </div>
+      <div id="file-modal-body">
+        <pre id="file-modal-pre"></pre>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    (function() {{
+      var modal = document.getElementById('file-modal');
+      var titleEl = document.getElementById('file-modal-title');
+      var preEl = document.getElementById('file-modal-pre');
+      document.getElementById('file-modal-close').addEventListener('click', closeModal);
+      modal.addEventListener('click', function(e) {{ if (e.target === modal) closeModal(); }});
+      document.addEventListener('keydown', function(e) {{ if (e.key === 'Escape') closeModal(); }});
+      function closeModal() {{
+        modal.classList.remove('open');
+        preEl.textContent = '';
+      }}
+      window.openFileModal = function(filename) {{
+        titleEl.textContent = filename;
+        preEl.textContent = 'Lade\u2026';
+        modal.classList.add('open');
+        fetch('/file/' + encodeURIComponent(filename))
+          .then(function(r) {{
+            if (!r.ok) throw new Error('HTTP ' + r.status);
+            return r.json();
+          }})
+          .then(function(data) {{ preEl.textContent = data.content; }})
+          .catch(function(err) {{ preEl.textContent = 'Fehler beim Laden: ' + err.message; }});
+      }};
+    }})();
+  </script>
 
 </body>
 </html>"""

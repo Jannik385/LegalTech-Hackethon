@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.responses import HTMLResponse
 from fastapi.staticfiles import StaticFiles
 from typing import List
+from urllib.parse import unquote
 
 from backend.services.classifier import classify_file
 from backend.services.summarizer import summarize_all_md
@@ -108,6 +109,17 @@ def link_files() -> dict:
     linked_report = link_results(summaries, classifications)
     session["linked_report"] = linked_report
     return linked_report.model_dump()
+
+
+@app.get("/file/{filename:path}")
+def get_file(filename: str) -> dict:
+    """Return the raw text content of an uploaded .md file by filename."""
+    filename = unquote(filename)
+    md_files: dict = session["md_files"]
+    if filename not in md_files:
+        raise HTTPException(status_code=404, detail=f"Datei '{filename}' nicht im Session-Store.")
+    content = md_files[filename].decode("utf-8", errors="replace")
+    return {"filename": filename, "content": content}
 
 
 @app.get("/dashboard", response_class=HTMLResponse)
