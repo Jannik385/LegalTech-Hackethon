@@ -6,12 +6,12 @@ saved and opened offline.
 
 The HTML structure:
   - Header with title and ISO-8601 creation timestamp
+  - Formalia skeleton section (2. Materiell-rechtlich filled from the briefs)
   - Summary sections (one per .md file) with key facts and anchor links to
     their referenced evidence items
   - Evidence gallery at the bottom where each item carries an id attribute
     matching the anchor used in the summary sections
-  - "Download als HTML" link that is injected by the frontend (or can be
-    triggered directly from the page via a small inline script)
+  - "Download als HTML" link that is injected by the frontend
 
 Usage::
 
@@ -23,9 +23,9 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from html import escape
-
 from backend.services.linker import LinkedReport, LinkedSummary
 from backend.services.classifier import ClassificationResult
+from backend.services.summarizer import FormaliaSkeleton
 
 
 # ---------------------------------------------------------------------------
@@ -64,6 +64,94 @@ def _badge(category: str) -> str:
 
 # ---------------------------------------------------------------------------
 # HTML fragment builders
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Formalia skeleton renderer
+# ---------------------------------------------------------------------------
+
+_STATUS_TREATED = "background:#d1fae5;color:#065f46"
+_STATUS_MISSING  = "background:#fee2e2;color:#991b1b"
+
+
+def _status_badge(text: str) -> str:
+    """Small coloured badge: green for content, red for 'nicht behandelt'/'fehlen'."""
+    is_empty = text.strip().lower() in ("nicht behandelt", "fehlen", "")
+    style = _STATUS_MISSING if is_empty else _STATUS_TREATED
+    label = "nicht behandelt" if is_empty else "behandelt"
+    return (
+        f'<span style="display:inline-block;padding:1px 8px;border-radius:10px;'
+        f'font-size:0.72rem;font-weight:600;{style};margin-left:6px">{label}</span>'
+    )
+
+
+def _render_formalia_skeleton_section(skeleton: FormaliaSkeleton) -> str:
+    """Render the filled Formalia 2. Materiell-rechtlich skeleton as an HTML section."""
+    if not skeleton.nodes:
+        return ""
+
+    # Group nodes by their hierarchy path
+    rows_html = ""
+    current_path = None
+    for node in skeleton.nodes:
+        if node.path != current_path:
+            current_path = node.path
+            rows_html += (
+                f'<tr><td colspan="3" style="padding:10px 12px 4px;background:#f7f8fa;'
+                f'font-size:0.75rem;font-weight:700;color:#57606a;text-transform:uppercase;'
+                f'letter-spacing:0.05em;border-bottom:1px solid #e5e7eb">'
+                f'{escape(node.path)}</td></tr>'
+            )
+
+        is_missing_schriftsatz = node.aus_dem_schriftsatz.strip().lower() in ("nicht behandelt", "")
+        is_missing_beweis      = node.beweise_begruendungen.strip().lower() in ("fehlen", "")
+        row_bg = "#fff8f8" if (is_missing_schriftsatz and is_missing_beweis) else "#ffffff"
+
+        rows_html += (
+            f'<tr style="background:{row_bg}">'
+            # Leaf node label
+            f'<td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;'
+            f'font-weight:600;font-size:0.85rem;color:#1f2328;white-space:nowrap;width:26%">'
+            f'{escape(node.label)}{_status_badge(node.aus_dem_schriftsatz)}</td>'
+            # Aus dem Schriftsatz
+            f'<td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;'
+            f'font-size:0.85rem;color:{"#b91c1c" if is_missing_schriftsatz else "#374151"};width:37%">'
+            f'{escape(node.aus_dem_schriftsatz)}</td>'
+            # Beweise / Begründungen
+            f'<td style="padding:10px 12px;border-bottom:1px solid #f0f0f0;vertical-align:top;'
+            f'font-size:0.85rem;color:{"#b91c1c" if is_missing_beweis else "#374151"};width:37%">'
+            f'{escape(node.beweise_begruendungen)}</td>'
+            f'</tr>'
+        )
+
+    return (
+        '<section style="margin-bottom:40px">'
+        '<h2 style="font-size:1.05rem;font-weight:700;margin:0 0 4px;color:#1f2328;'
+        'padding-bottom:8px;border-bottom:2px solid #e5e7eb">2. Materiell-rechtlich — Prüfungsrahmen</h2>'
+        '<p style="margin:0 0 14px;font-size:0.8rem;color:#57606a">'
+        'Jeder Prüfungspunkt aus dem Gliederungsrahmen (Formalia.md) — bewertet anhand der hochgeladenen Schriftsätze.</p>'
+        '<div style="overflow-x:auto">'
+        '<table style="width:100%;border-collapse:collapse;font-family:inherit">'
+        '<thead>'
+        '<tr style="background:#f7f8fa">'
+        '<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
+        'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb">Prüfungspunkt</th>'
+        '<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
+        'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb">Aus dem Schriftsatz</th>'
+        '<th style="padding:8px 12px;text-align:left;font-size:0.78rem;font-weight:700;'
+        'color:#57606a;text-transform:uppercase;letter-spacing:0.04em;border-bottom:2px solid #e5e7eb">Beweise / Begründungen</th>'
+        '</tr>'
+        '</thead>'
+        f'<tbody>{rows_html}</tbody>'
+        '</table>'
+        '</div>'
+        '</section>'
+    )
+
+
+# ---------------------------------------------------------------------------
+# Summary section renderer
 # ---------------------------------------------------------------------------
 
 
@@ -150,6 +238,13 @@ def render_dashboard(linked_report: LinkedReport) -> str:
     """
     timestamp = datetime.now(tz=timezone.utc).strftime("%d.%m.%Y %H:%M UTC")
 
+    # ── Formalia skeleton section (from first entry that has one) ─────────
+    skeleton_section = ""
+    for entry in linked_report.entries:
+        if entry.formalia_skeleton is not None:
+            skeleton_section = _render_formalia_skeleton_section(entry.formalia_skeleton)
+            break
+
     # ── Summary sections ──────────────────────────────────────────────────
     summary_sections = "".join(
         _render_summary_section(entry) for entry in linked_report.entries
@@ -234,7 +329,9 @@ def render_dashboard(linked_report: LinkedReport) -> str:
     </div>
   </header>
 
-  <main style="max-width:820px;margin:0 auto;padding:0 24px 48px">
+  <main style="max-width:960px;margin:0 auto;padding:0 24px 48px">
+
+    {skeleton_section}
 
     <section style="margin-bottom:36px">
       <h2 style="font-size:1.05rem;font-weight:700;margin:0 0 16px;color:#1f2328;

@@ -15,7 +15,7 @@ from __future__ import annotations
 from pydantic import BaseModel
 
 from backend.services.classifier import ClassificationResult
-from backend.services.summarizer import SummaryResult, Topic
+from backend.services.summarizer import SummaryResult, Topic, FormaliaSkeleton
 
 
 # ---------------------------------------------------------------------------
@@ -31,6 +31,7 @@ class LinkedSummary(BaseModel):
     key_facts: list[str]
     template_output: str
     topics: list[Topic] = []
+    formalia_skeleton: FormaliaSkeleton | None = None
     evidence_links: list[ClassificationResult]
 
 
@@ -98,6 +99,7 @@ def link_results(
                 key_facts=summary.key_facts,
                 template_output=summary.template_output,
                 topics=summary.topics,
+                formalia_skeleton=summary.formalia_skeleton,
                 evidence_links=evidence,
             )
         )

@@ -4,7 +4,10 @@ Summarizes .md files into a structured legal summary by calling the
 OpenRouter API.
 
 Single-file path  → flat summary + key_facts (unchanged behaviour).
-Combined overview → topic-based structure with per-side key points.
+Combined overview → Formalia-skeleton-driven structure.
+  The skeleton from Formalia.md (2. Materiell-rechtlich) is the fixed output
+  frame. The LLM fills in exactly the 16 leaf nodes; intermediate nodes are
+  headings only.
 """
 
 from __future__ import annotations
@@ -37,7 +40,79 @@ SUMMARY_TEMPLATE = """\
 _FILE_SEPARATOR = "\n\n---\n\n"
 
 # ---------------------------------------------------------------------------
+# Formalia skeleton — leaf nodes (fixed, mirrors Formalia.md exactly)
+# ---------------------------------------------------------------------------
+
+# Each entry: (node_id, human-readable label, hierarchy path for display)
+# node_id is the JSON key the LLM must produce.
+FORMALIA_LEAF_NODES: list[tuple[str, str, str]] = [
+    # 2.1 Minderung > 2.1.1 Eröffnung
+    ("wirksamer_mietvertrag",       "Wirksamer Mietvertrag, § 535 BGB",
+     "2.1 Minderung > 2.1.1 Eröffnung des Mängelgewährleistungsrechts"),
+    ("mietmangel",                  "Mietmangel, § 534 BGB",
+     "2.1 Minderung > 2.1.1 Eröffnung des Mängelgewährleistungsrechts"),
+    ("massgeblicher_zeitpunkt",     "Maßgeblicher Zeitpunkt, § 536 Abs. 1 BGB",
+     "2.1 Minderung > 2.1.1 Eröffnung des Mängelgewährleistungsrechts"),
+    # 2.1.1.4 Kein Ausschluss
+    ("kein_ausschluss_vertraglich", "Vertraglich (Beachte: § 536b BGB)",
+     "2.1 Minderung > 2.1.1 Eröffnung > 2.1.1.4 Kein Ausschluss"),
+    ("kenntnis",                    "Kenntnis, § 536b BGB",
+     "2.1 Minderung > 2.1.1 Eröffnung > 2.1.1.4 Kein Ausschluss > Gesetzlich"),
+    ("unterlassene_maenzelanzeige", "Unterlassene Mängelanzeige, § 536c BGB",
+     "2.1 Minderung > 2.1.1 Eröffnung > 2.1.1.4 Kein Ausschluss > Gesetzlich"),
+    # 2.1.2 Rechtsfolge
+    ("herabsetzung",                "Herabsetzung des Anspruchs auf Mietzahlung",
+     "2.1 Minderung > 2.1.2 Rechtsfolge"),
+    ("rueckerstattung",             "Rückerstattung der ungeminderten Miete, § 812 BGB",
+     "2.1 Minderung > 2.1.2 Rechtsfolge"),
+    # 2.2 Rücktritt > Vermieter
+    ("vermieter_ordentlich",        "Ordentlich: § 542 Abs. 1 BGB (Beachte: §§ 573, 573a BGB)",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Vermieter"),
+    ("vermieter_fristlos_543",      "§§ 543 Abs. 1, 2 Nr. 2 und 3 BGB",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Vermieter > Außerordentlich > Fristlos"),
+    ("vermieter_fristlos_569",      "§ 569 Abs. 2 BGB",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Vermieter > Außerordentlich > Fristlos"),
+    ("vermieter_befristet",         "Befristet: Bsp.: § 580 BGB",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Vermieter > Außerordentlich"),
+    # 2.2 Rücktritt > Mieter
+    ("mieter_ordentlich",           "Ordentlich: § 542 Abs. 1 BGB",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Mieter"),
+    ("mieter_fristlos_543",         "§§ 543 Abs. 1, 2 Nr. 2 BGB",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Mieter > Außerordentlich > Fristlos"),
+    ("mieter_fristlos_569",         "§§ 569 Abs. 1, 2 BGB",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Mieter > Außerordentlich > Fristlos"),
+    ("mieter_befristet",            "Befristet: Bsp.: § 580 BGB",
+     "2.2 Rücktritt > 2.2.1 Grundsätzlich > Mieter > Außerordentlich"),
+]
+
+_LEAF_IDS: list[str] = [n[0] for n in FORMALIA_LEAF_NODES]
+
+# ---------------------------------------------------------------------------
 # Pydantic result models
+# ---------------------------------------------------------------------------
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models — Formalia skeleton
+# ---------------------------------------------------------------------------
+
+
+class LeafNodeReview(BaseModel):
+    """Filled review for one leaf node in the Formalia skeleton."""
+    node_id: str
+    label: str
+    path: str
+    aus_dem_schriftsatz: str   # what the brief argues / "nicht behandelt"
+    beweise_begruendungen: str # evidence / reasoning cited / "fehlen"
+
+
+class FormaliaSkeleton(BaseModel):
+    """Filled 2. Materiell-rechtlich skeleton — one LeafNodeReview per leaf."""
+    nodes: list[LeafNodeReview]
+
+
+# ---------------------------------------------------------------------------
+# Pydantic models — topic-based overview (unchanged)
 # ---------------------------------------------------------------------------
 
 
@@ -73,6 +148,8 @@ class SummaryResult(BaseModel):
     template_output: str
     # Structured topics — only populated for the combined overview
     topics: list[Topic] = []
+    # Filled Formalia skeleton — only populated for the combined overview
+    formalia_skeleton: FormaliaSkeleton | None = None
 
 
 # ---------------------------------------------------------------------------
@@ -295,6 +372,110 @@ def _render_template(filename: str, summary: str, key_facts: list[str]) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Formalia skeleton — prompt, parser, renderer
+# ---------------------------------------------------------------------------
+
+def _skeleton_system_prompt(rag_context: str = "") -> str:
+    """System prompt for the Formalia skeleton fill-in call.
+
+    Instructs the model to review the uploaded briefs against every leaf node
+    of the 2. Materiell-rechtlich skeleton and produce a JSON object with one
+    entry per leaf node.
+    """
+    nodes_desc = "\n".join(
+        f'  "{node_id}": {{"aus_dem_schriftsatz": "...", "beweise_begruendungen": "..."}}'
+        f'  // {label} — {path}'
+        for node_id, label, path in FORMALIA_LEAF_NODES
+    )
+    rag_block = (
+        f"\n\n## Relevante Rechtsgrundlagen (aus Wissensbasis)\n{rag_context}"
+        if rag_context else ""
+    )
+    return (
+        "Du bist ein juristischer Dokumentenanalyst, spezialisiert auf deutsches Mietrecht.\n"
+        "Du erhältst einen oder mehrere Schriftsätze zu einem Mietrechtsstreit.\n\n"
+        "## Deine Aufgabe\n\n"
+        "Gehe die folgende Liste der 16 Prüfungspunkte aus dem Gliederungsrahmen "
+        "2. Materiell-rechtlich durch.\n"
+        "Für jeden Punkt beantworte:\n"
+        "  1. \"aus_dem_schriftsatz\": Was trägt der/die Schriftsatz/-sätze zu diesem Prüfungspunkt vor? "
+        "Wenn der Punkt nicht behandelt wird, schreibe \"nicht behandelt\".\n"
+        "  2. \"beweise_begruendungen\": Welche Belege oder rechtlichen Begründungen werden für diesen "
+        "Punkt angeführt? Wenn keine vorhanden, schreibe \"fehlen\".\n\n"
+        "Halte dich strikt an die vorgegebenen Schlüsselnamen. "
+        "Erfinde keine zusätzlichen Prüfungspunkte.\n"
+        "Antworte ausschließlich mit einem JSON-Objekt (kein weiterer Text, keine Markdown-Umrandung)."
+        + rag_block
+        + "\n\n## Ausgabeformat\n\n"
+        "{\n"
+        + nodes_desc
+        + "\n}"
+    )
+
+
+def _skeleton_user_prompt(files: dict[str, str]) -> str:
+    parts = []
+    for fname, content in files.items():
+        excerpt = content[:10_000]
+        if len(content) > 10_000:
+            excerpt += "\n\n[... Dokument gekürzt ...]"
+        parts.append(f"## Schriftsatz: {fname}\n\n{excerpt}")
+    return "\n\n---\n\n".join(parts)
+
+
+def _parse_skeleton_response(raw: str) -> FormaliaSkeleton:
+    """Parse the LLM's skeleton JSON into a FormaliaSkeleton model.
+
+    Falls back to 'nicht behandelt' / 'fehlen' for any missing node.
+    """
+    cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw).strip()
+    try:
+        data = json.loads(cleaned)
+    except (json.JSONDecodeError, AttributeError):
+        data = {}
+
+    nodes: list[LeafNodeReview] = []
+    for node_id, label, path in FORMALIA_LEAF_NODES:
+        entry = data.get(node_id, {})
+        if not isinstance(entry, dict):
+            entry = {}
+        nodes.append(LeafNodeReview(
+            node_id=node_id,
+            label=label,
+            path=path,
+            aus_dem_schriftsatz=str(entry.get("aus_dem_schriftsatz", "nicht behandelt")).strip() or "nicht behandelt",
+            beweise_begruendungen=str(entry.get("beweise_begruendungen", "fehlen")).strip() or "fehlen",
+        ))
+    return FormaliaSkeleton(nodes=nodes)
+
+
+def _call_skeleton(files: dict[str, str], rag_context: str = "") -> FormaliaSkeleton:
+    """Make the LLM call that fills in the Formalia skeleton."""
+    messages = [
+        {"role": "system", "content": _skeleton_system_prompt(rag_context)},
+        {"role": "user",   "content": _skeleton_user_prompt(files)},
+    ]
+    with OpenRouter(api_key=OPENROUTER_API_KEY) as client:
+        res = client.chat.send(model=MODEL, messages=messages, stream=False)
+    raw = res.choices[0].message.content or ""
+    return _parse_skeleton_response(raw)
+
+
+def render_formalia_skeleton(skeleton: FormaliaSkeleton) -> str:
+    """Render a filled FormaliaSkeleton as a plain-text string (used as template_output)."""
+    lines = ["=== 2. Materiell-rechtlich — Prüfungsrahmen ===\n"]
+    current_path = ""
+    for node in skeleton.nodes:
+        if node.path != current_path:
+            lines.append(f"\n[ {node.path} ]")
+            current_path = node.path
+        lines.append(f"\n  {node.label}")
+        lines.append(f"  → Aus dem Schriftsatz: {node.aus_dem_schriftsatz}")
+        lines.append(f"  → Beweise / Begründungen: {node.beweise_begruendungen}")
+    return "\n".join(lines)
+
+
+# ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
 
@@ -302,10 +483,15 @@ def _render_template(filename: str, summary: str, key_facts: list[str]) -> str:
 def summarize_all_md(files: dict[str, str]) -> SummaryResult:
     """Summarize all Markdown files as one topic-structured combined overview.
 
-    Expects exactly two files (the two opposing sides).  If more than two are
+    Makes two LLM calls:
+      1. The existing topic-overview call (summary + topics).
+      2. A new skeleton-fill call that walks every leaf node of the
+         2. Materiell-rechtlich section from Formalia.md.
+
+    Expects at least two files (the two opposing sides).  If more than two are
     provided the first two are used as side A / B and the rest are appended to
     side B's content.  If only one file is provided it falls back to the
-    single-file path.
+    single-file path (no skeleton produced).
     """
     if len(files) == 0:
         raise ValueError("Keine Dateien übergeben.")
@@ -331,6 +517,7 @@ def summarize_all_md(files: dict[str, str]) -> SummaryResult:
     except Exception:
         pass  # RAG is optional — proceed without it
 
+    # ── Call 1: topic overview ────────────────────────────────────────────
     messages = [
         {"role": "system", "content": _overview_system_prompt(side_a_name, side_b_name, rag_context)},
         {"role": "user",   "content": _overview_user_prompt(side_a_name, content_a, side_b_name, content_b)},
@@ -341,7 +528,10 @@ def summarize_all_md(files: dict[str, str]) -> SummaryResult:
 
     raw = res.choices[0].message.content or ""
     summary, topics, flat_facts = _parse_overview_response(raw, side_a_name, side_b_name)
-    template_output = _render_template("Gesamtübersicht", summary, flat_facts)
+
+    # ── Call 2: Formalia skeleton fill-in ─────────────────────────────────
+    skeleton = _call_skeleton(files, rag_context)
+    template_output = render_formalia_skeleton(skeleton)
 
     return SummaryResult(
         filename="Gesamtübersicht",
@@ -349,6 +539,7 @@ def summarize_all_md(files: dict[str, str]) -> SummaryResult:
         key_facts=flat_facts,
         template_output=template_output,
         topics=topics,
+        formalia_skeleton=skeleton,
     )
 
 
