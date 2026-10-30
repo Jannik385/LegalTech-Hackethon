@@ -566,6 +566,19 @@
       font-weight: 600;
     }
     .md-link:hover { color: #2563b0; }
+    .citation-link {
+      color: #7c5cd8;
+      cursor: pointer;
+      text-decoration: none;
+      background: none;
+      border: none;
+      padding: 0;
+      font: inherit;
+      font-weight: 600;
+      font-size: 0.82em;
+      border-bottom: 1px dashed #7c5cd8;
+    }
+    .citation-link:hover { color: #5a3ea8; border-bottom-style: solid; }
   </style>
 </head>
 <body>
@@ -644,6 +657,7 @@
     const linkedCards     = document.getElementById('linked-cards');
 
     let selectedFiles = [];
+    let uploadedMdFiles = []; // filenames from the last upload, e.g. ["M01.md", "M09.md"]
 
     // ── Drag-and-drop events ──────────────────────────────────────────────
     dropZone.addEventListener('dragover', (e) => {
@@ -692,6 +706,7 @@
         const response = await fetch('/upload', { method: 'POST', body: formData });
         if (!response.ok) throw new Error(`Server: ${response.status} ${response.statusText}`);
         const data = await response.json();
+        uploadedMdFiles = data.md_files || [];
         renderUploadResults(data);
         statusEl.textContent = 'Upload erfolgreich.';
         // Show classify button only if there are non-MD files
@@ -859,7 +874,7 @@
       const sidesHtml = t.sides.map((side, idx) => {
         const cls = idx === 0 ? 'topic-side-a' : 'topic-side-b';
         const pointsHtml = side.points.length > 0
-          ? '<ul>' + side.points.map(p => `<li>${escHtml(p)}</li>`).join('') + '</ul>'
+          ? '<ul>' + side.points.map(p => `<li>${linkCitations(p)}</li>`).join('') + '</ul>'
           : '<p class="empty-note" style="margin:0">—</p>';
         return `<div class="topic-side ${cls}">
           <div class="topic-side-label" title="${escHtml(side.side)}">${escHtml(side.side)}</div>
@@ -894,11 +909,26 @@
       </div>`;
     }
 
+    // ── Inline citation linker ────────────────────────────────────────────
+    // Turns (M09) / (M09.MD) refs inside bullet text into clickable buttons.
+    function linkCitations(text) {
+      const escaped = escHtml(text);
+      return escaped.replace(/\(([A-Za-z]\d+(?:\.md)?)\)/gi, (match, ref) => {
+        const refBase = ref.replace(/\.md$/i, '').toUpperCase();
+        const found = uploadedMdFiles.find(
+          fn => fn.replace(/\.md$/i, '').toUpperCase() === refBase
+        );
+        if (!found) return match; // no matching file — leave as plain text
+        const safeFile = found.replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        return `<button class="citation-link" onclick="openFileModal('${safeFile}')">(${escHtml(ref)})</button>`;
+      });
+    }
+
     function renderFlatFactsHtml(key_facts) {
       if (!key_facts || key_facts.length === 0)
         return '<p class="empty-note">Keine Key Facts extrahiert.</p>';
       return '<strong>Key Facts:</strong><ul>' +
-        key_facts.map(f => `<li>${escHtml(f)}</li>`).join('') + '</ul>';
+        key_facts.map(f => `<li>${linkCitations(f)}</li>`).join('') + '</ul>';
     }
 
     // ── Category → CSS class mapping ─────────────────────────────────────
