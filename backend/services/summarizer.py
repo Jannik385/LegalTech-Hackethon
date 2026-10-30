@@ -588,12 +588,17 @@ Unterpunkte:
 """
 
 
-def _overview_system_prompt(side_a: str, side_b: str, rag_context: str = "") -> str:
+def _overview_system_prompt(
+    side_a: str, side_b: str, filename_a: str, filename_b: str, rag_context: str = ""
+) -> str:
+    stem_a = re.sub(r'\.md$', '', filename_a, flags=re.IGNORECASE)
+    stem_b = re.sub(r'\.md$', '', filename_b, flags=re.IGNORECASE)
     rag_block = f"\n\n## Relevante Rechtsgrundlagen (aus Wissensbasis)\n{rag_context}" if rag_context else ""
     return (
         "Du bist ein juristischer Dokumentenanalyst, spezialisiert auf deutsches Mietrecht.\n"
         f"Du erhältst zwei Schriftsätze zu einem Mietrechtsstreit: "
-        f'Seite A heißt \"{side_a}\", Seite B heißt \"{side_b}\".\n\n'
+        f'Seite A heißt \"{side_a}\" (Dateiname: {stem_a}), '
+        f'Seite B heißt \"{side_b}\" (Dateiname: {stem_b}).\n\n'
         + LEGAL_TAXONOMY
         + rag_block
         + "\n\n"
@@ -604,6 +609,8 @@ def _overview_system_prompt(side_a: str, side_b: str, rag_context: str = "") -> 
         "gemäß der obigen Klassifikation.\n"
         "3. Formuliere für jeden Streitpunkt 2–4 Kernargumente für Seite A "
         "und 2–4 Kernargumente für Seite B — auf Deutsch, präzise, ohne Aufzählungszeichen.\n"
+        "   Wenn du dich auf ein konkretes Dokument aus den Schriftsätzen beziehst, "
+        f"   füge dessen Dateinamen in Klammern an, z. B. ({stem_a}) oder ({stem_b}).\n"
         "4. Liste für jeden Streitpunkt die herangezogenen Paragraphen auf "
         "(leer lassen bei hauptverhandlung wenn keine einschlägigen Normen).\n"
         "5. Erkenne fehlende Unterlagen pro Streitpunkt: Wenn ein Schriftsatz für diesen "
@@ -634,7 +641,10 @@ def _overview_system_prompt(side_a: str, side_b: str, rag_context: str = "") -> 
     )
 
 
-def _overview_user_prompt(side_a: str, content_a: str, side_b: str, content_b: str) -> str:
+def _overview_user_prompt(
+    side_a: str, content_a: str, filename_a: str,
+    side_b: str, content_b: str, filename_b: str,
+) -> str:
     def _excerpt(text: str) -> str:
         t = text[:10_000]
         if len(text) > 10_000:
@@ -642,9 +652,9 @@ def _overview_user_prompt(side_a: str, content_a: str, side_b: str, content_b: s
         return t
 
     return (
-        f"## Dokument Seite A: {side_a}\n\n{_excerpt(content_a)}\n\n"
+        f"## Dokument Seite A: {side_a} ({filename_a})\n\n{_excerpt(content_a)}\n\n"
         f"---\n\n"
-        f"## Dokument Seite B: {side_b}\n\n{_excerpt(content_b)}"
+        f"## Dokument Seite B: {side_b} ({filename_b})\n\n{_excerpt(content_b)}"
     )
 
 
@@ -999,10 +1009,17 @@ def summarize_all_md(files: dict[str, str]) -> SummaryResult:
     except Exception:
         pass  # RAG is optional — proceed without it
 
+    filename_a, filename_b = items[0][0], items[1][0]
+
     # ── Call 1: topic overview ────────────────────────────────────────────
     messages = [
-        {"role": "system", "content": _overview_system_prompt(side_a_name, side_b_name, rag_context)},
-        {"role": "user",   "content": _overview_user_prompt(side_a_name, content_a, side_b_name, content_b)},
+        {"role": "system", "content": _overview_system_prompt(
+            side_a_name, side_b_name, filename_a, filename_b, rag_context
+        )},
+        {"role": "user",   "content": _overview_user_prompt(
+            side_a_name, content_a, filename_a,
+            side_b_name, content_b, filename_b,
+        )},
     ]
 
     with OpenRouter(api_key=OPENROUTER_API_KEY) as client:
