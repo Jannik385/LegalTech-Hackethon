@@ -695,41 +695,69 @@ def _render_template(filename: str, summary: str, key_facts: list[str]) -> str:
 # Formalia skeleton — prompt, parser, renderer
 # ---------------------------------------------------------------------------
 
-def _skeleton_system_prompt(rag_context: str = "") -> str:
+def _skeleton_system_prompt(side_a: str, side_b: str, rag_context: str = "") -> str:
     """System prompt for the Formalia skeleton fill-in call.
 
-    Instructs the model to review the uploaded briefs against every leaf node
-    of the 2. Materiell-rechtlich skeleton and produce a JSON object with one
-    entry per leaf node.
+    Instructs the model to fill in only subsumtion + zwischenergebnis per side
+    per hardcoded Tatbestandsmerkmal for each of the 16 leaf nodes.
+    Tatbestandsmerkmale and Definitionen are provided here — the LLM must NOT
+    invent them.
     """
-    nodes_desc = "\n".join(
-        f'  "{node_id}": {{"aus_dem_schriftsatz": "...", "beweise_begruendungen": "..."}}'
-        f'  // {label} — {path}'
-        for node_id, label, path in FORMALIA_LEAF_NODES
+    # Build the nodes description: list each node with its hardcoded Merkmale
+    node_parts: list[str] = []
+    for node_id, label, path in FORMALIA_LEAF_NODES:
+        merkmale = LEAF_NODE_MERKMALE.get(node_id, [])
+        merkmal_lines = "\n".join(
+            f'    - Tatbestandsmerkmal: "{m_label}"\n'
+            f'      Definition: {m_def}'
+            for m_label, m_def in merkmale
+        )
+        node_parts.append(
+            f'  Node "{node_id}" — {label} ({path}):\n{merkmal_lines}'
+        )
+    nodes_desc = "\n\n".join(node_parts)
+
+    # Build example JSON shape for one node
+    example_merkmal = (
+        '    {\n'
+        '      "merkmal": "<Tatbestandsmerkmal-Label exakt wie angegeben>",\n'
+        f'      "seite_a": {{"subsumtion": "...", "zwischenergebnis": "erfüllt|streitig|nicht erfüllt|offen"}},\n'
+        f'      "seite_b": {{"subsumtion": "...", "zwischenergebnis": "erfüllt|streitig|nicht erfüllt|offen"}}\n'
+        '    }'
     )
+
     rag_block = (
         f"\n\n## Relevante Rechtsgrundlagen (aus Wissensbasis)\n{rag_context}"
         if rag_context else ""
     )
     return (
         "Du bist ein juristischer Dokumentenanalyst, spezialisiert auf deutsches Mietrecht.\n"
-        "Du erhältst einen oder mehrere Schriftsätze zu einem Mietrechtsstreit.\n\n"
-        "## Deine Aufgabe\n\n"
-        "Gehe die folgende Liste der 16 Prüfungspunkte aus dem Gliederungsrahmen "
-        "2. Materiell-rechtlich durch.\n"
-        "Für jeden Punkt beantworte:\n"
-        "  1. \"aus_dem_schriftsatz\": Was trägt der/die Schriftsatz/-sätze zu diesem Prüfungspunkt vor? "
-        "Wenn der Punkt nicht behandelt wird, schreibe \"nicht behandelt\".\n"
-        "  2. \"beweise_begruendungen\": Welche Belege oder rechtlichen Begründungen werden für diesen "
-        "Punkt angeführt? Wenn keine vorhanden, schreibe \"fehlen\".\n\n"
-        "Halte dich strikt an die vorgegebenen Schlüsselnamen. "
-        "Erfinde keine zusätzlichen Prüfungspunkte.\n"
-        "Antworte ausschließlich mit einem JSON-Objekt (kein weiterer Text, keine Markdown-Umrandung)."
+        f'Du erhältst Schriftsätze von zwei Parteien: Seite A heißt "{side_a}", '
+        f'Seite B heißt "{side_b}".\n\n'
+        "## Wichtige Regeln\n\n"
+        "1. Die Tatbestandsmerkmale und ihre Definitionen sind FEST VORGEGEBEN — "
+        "du darfst sie nicht verändern, ergänzen oder weglassen.\n"
+        "2. Du füllst NUR die Felder `subsumtion` und `zwischenergebnis` — "
+        "je einmal für Seite A und einmal für Seite B — pro Tatbestandsmerkmal.\n"
+        "3. Wenn eine Seite ein Tatbestandsmerkmal nicht behandelt: "
+        '`subsumtion: "nicht behandelt"`, `zwischenergebnis: "offen"`.\n'
+        "4. Antworte ausschließlich mit einem JSON-Objekt (kein weiterer Text, "
+        "keine Markdown-Umrandung).\n"
         + rag_block
-        + "\n\n## Ausgabeformat\n\n"
-        "{\n"
+        + "\n\n## Prüfungsrahmen — 16 Leaf Nodes mit Tatbestandsmerkmalen\n\n"
         + nodes_desc
-        + "\n}"
+        + "\n\n## Ausgabeformat\n\n"
+        "Für jeden Node ein Schlüssel mit dem angegebenen node_id. "
+        "Unter jedem Schlüssel ein `merkmale`-Array in der exakten Reihenfolge "
+        "der oben genannten Tatbestandsmerkmale:\n\n"
+        "{\n"
+        '  "<node_id>": {\n'
+        '    "merkmale": [\n'
+        + example_merkmal + "\n"
+        "    ]\n"
+        "  },\n"
+        "  ...\n"
+        "}"
     )
 
 
@@ -743,10 +771,13 @@ def _skeleton_user_prompt(files: dict[str, str]) -> str:
     return "\n\n---\n\n".join(parts)
 
 
-def _parse_skeleton_response(raw: str) -> FormaliaSkeleton:
+def _parse_skeleton_response(raw: str, side_a: str, side_b: str) -> FormaliaSkeleton:
     """Parse the LLM's skeleton JSON into a FormaliaSkeleton model.
 
-    Falls back to 'nicht behandelt' / 'fehlen' for any missing node.
+    For each node, iterates LEAF_NODE_MERKMALE (hardcoded order) and matches
+    LLM entries by merkmal label (case-insensitive); falls back by index.
+    Falls back to 'nicht behandelt' / 'offen' on any missing field or total
+    JSON parse failure.
     """
     cleaned = re.sub(r"```(?:json)?\s*|\s*```", "", raw).strip()
     try:
@@ -756,29 +787,75 @@ def _parse_skeleton_response(raw: str) -> FormaliaSkeleton:
 
     nodes: list[LeafNodeReview] = []
     for node_id, label, path in FORMALIA_LEAF_NODES:
-        entry = data.get(node_id, {})
-        if not isinstance(entry, dict):
-            entry = {}
+        node_entry = data.get(node_id, {})
+        if not isinstance(node_entry, dict):
+            node_entry = {}
+
+        llm_merkmale: list[dict] = node_entry.get("merkmale", [])
+        if not isinstance(llm_merkmale, list):
+            llm_merkmale = []
+
+        hardcoded = LEAF_NODE_MERKMALE.get(node_id, [])
+        merkmale_reviews: list[TatbestandsmerkmalReview] = []
+
+        for idx, (m_label, m_def) in enumerate(hardcoded):
+            # Try to find matching LLM entry by label first, then fall back by index
+            llm_entry: dict = {}
+            for candidate in llm_merkmale:
+                if not isinstance(candidate, dict):
+                    continue
+                candidate_label = str(candidate.get("merkmal", "")).strip().lower()
+                if candidate_label == m_label.strip().lower():
+                    llm_entry = candidate
+                    break
+            if not llm_entry and idx < len(llm_merkmale):
+                candidate = llm_merkmale[idx]
+                if isinstance(candidate, dict):
+                    llm_entry = candidate
+
+            # Extract per-side data with fallbacks
+            def _parse_side(key: str, side_name: str) -> SeitenReview:
+                side_data = llm_entry.get(key, {}) if llm_entry else {}
+                if not isinstance(side_data, dict):
+                    side_data = {}
+                subsumtion = str(side_data.get("subsumtion", "")).strip() or "nicht behandelt"
+                zwischenergebnis = str(side_data.get("zwischenergebnis", "")).strip() or "offen"
+                return SeitenReview(
+                    side=side_name,
+                    subsumtion=subsumtion,
+                    zwischenergebnis=zwischenergebnis,
+                )
+
+            merkmale_reviews.append(TatbestandsmerkmalReview(
+                label=m_label,
+                definition=m_def,
+                sides=[_parse_side("seite_a", side_a), _parse_side("seite_b", side_b)],
+            ))
+
         nodes.append(LeafNodeReview(
             node_id=node_id,
             label=label,
             path=path,
-            aus_dem_schriftsatz=str(entry.get("aus_dem_schriftsatz", "nicht behandelt")).strip() or "nicht behandelt",
-            beweise_begruendungen=str(entry.get("beweise_begruendungen", "fehlen")).strip() or "fehlen",
+            merkmale=merkmale_reviews,
         ))
     return FormaliaSkeleton(nodes=nodes)
 
 
-def _call_skeleton(files: dict[str, str], rag_context: str = "") -> FormaliaSkeleton:
+def _call_skeleton(
+    files: dict[str, str],
+    rag_context: str = "",
+    side_a: str = "Seite A",
+    side_b: str = "Seite B",
+) -> FormaliaSkeleton:
     """Make the LLM call that fills in the Formalia skeleton."""
     messages = [
-        {"role": "system", "content": _skeleton_system_prompt(rag_context)},
+        {"role": "system", "content": _skeleton_system_prompt(side_a, side_b, rag_context)},
         {"role": "user",   "content": _skeleton_user_prompt(files)},
     ]
     with OpenRouter(api_key=OPENROUTER_API_KEY) as client:
         res = client.chat.send(model=MODEL, messages=messages, stream=False)
     raw = res.choices[0].message.content or ""
-    return _parse_skeleton_response(raw)
+    return _parse_skeleton_response(raw, side_a, side_b)
 
 
 def render_formalia_skeleton(skeleton: FormaliaSkeleton) -> str:
@@ -787,11 +864,16 @@ def render_formalia_skeleton(skeleton: FormaliaSkeleton) -> str:
     current_path = ""
     for node in skeleton.nodes:
         if node.path != current_path:
-            lines.append(f"\n[ {node.path} ]")
+            lines.append(f"\n[ {node.path} ]\n")
             current_path = node.path
-        lines.append(f"\n  {node.label}")
-        lines.append(f"  → Aus dem Schriftsatz: {node.aus_dem_schriftsatz}")
-        lines.append(f"  → Beweise / Begründungen: {node.beweise_begruendungen}")
+        lines.append(f"\n  {node.label}\n")
+        for merkmal in node.merkmale:
+            lines.append(f"\n    Tatbestandsmerkmal: {merkmal.label}")
+            lines.append(f"    Definition: {merkmal.definition}\n")
+            for side_review in merkmal.sides:
+                lines.append(f"    {side_review.side}:")
+                lines.append(f"      Subsumtion: {side_review.subsumtion}")
+                lines.append(f"      Zwischenergebnis: {side_review.zwischenergebnis}\n")
     return "\n".join(lines)
 
 
@@ -850,7 +932,7 @@ def summarize_all_md(files: dict[str, str]) -> SummaryResult:
     summary, topics, flat_facts = _parse_overview_response(raw, side_a_name, side_b_name)
 
     # ── Call 2: Formalia skeleton fill-in ─────────────────────────────────
-    skeleton = _call_skeleton(files, rag_context)
+    skeleton = _call_skeleton(files, rag_context, side_a_name, side_b_name)
     template_output = render_formalia_skeleton(skeleton)
 
     return SummaryResult(
