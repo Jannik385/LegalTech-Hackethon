@@ -57,7 +57,7 @@ must be inlined so badge spans render correctly without any external stylesheet.
 - Source CSS: `frontend/index.html` lines 323–366.
 - Target: `backend/services/renderer.py`, `<style>` block inside `render_dashboard()`.
 
-**Status** `[ ] pending`
+**Status** `[x] done`
 
 ---
 
@@ -92,7 +92,7 @@ definitions get a `data-tooltip` attribute so the CSS from Sub-Task 1 activates 
   `[label, definition]` pairs.
 - `_render_summary_section` is at `renderer.py` lines 205–260.
 
-**Status** `[ ] pending`
+**Status** `[x] done`
 
 ---
 
@@ -135,4 +135,4 @@ Each key-fact string may contain `(M09)` or `(M09.md)` inline refs. These must b
 - Call-site: `renderer.py` lines 300–301.
 - `escape` already imported in `renderer.py` (`from html import escape`).
 
-**Status** `[ ] pending`
+**Status** `[x] done`
